@@ -101,6 +101,26 @@ var FSHADER_SHADOW_SOURCE = `
         gl_FragColor = packFloatToVec4i(gl_FragCoord.z);
     }
   `;
+  var VSHADER_SOURCE_ENVCUBE = `
+  attribute vec4 a_Position;
+  varying vec4 v_Position;
+  void main() {
+    v_Position = a_Position;
+    gl_Position = a_Position;
+  } 
+`;
+
+var FSHADER_SOURCE_ENVCUBE = `
+  precision mediump float;
+  uniform samplerCube u_envCubeMap;
+  uniform mat4 u_viewDirectionProjectionInverse;
+  varying vec4 v_Position;
+  void main() {
+    vec4 t = u_viewDirectionProjectionInverse * v_Position;
+    gl_FragColor = textureCube(u_envCubeMap, normalize(t.xyz / t.w));
+  }
+`;
+
 function compileShader(gl, vShaderText, fShaderText) {
     //////Build vertex and fragment shader objects
     var vertexShader = gl.createShader(gl.VERTEX_SHADER)
@@ -136,43 +156,12 @@ function compileShader(gl, vShaderText, fShaderText) {
 
     return program;
 }
-function initAttributeVariable(gl, a_attribute, buffer) {
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.vertexAttribPointer(a_attribute, buffer.num, buffer.type, false, 0, 0);
-    gl.enableVertexAttribArray(a_attribute);
-}
-
-function initArrayBufferForLaterUse(gl, data, num, type) {
-    // Create a buffer object
-    var buffer = gl.createBuffer();
-    if (!buffer) {
-        console.log('Failed to create the buffer object');
-        return null;
-    }
-    // Write date into the buffer object
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
-    // Store the necessary information to assign the object to the attribute variable later
-    buffer.num = num;
-    buffer.type = type;
-
-    return buffer;
-}
-function initVertexBufferForLaterUse(gl, vertices, normals, texCoords) {
-    var nVertices = vertices.length / 3;
-
-    var o = new Object();
-    o.vertexBuffer = initArrayBufferForLaterUse(gl, new Float32Array(vertices), 3, gl.FLOAT);
-    if (normals != null) o.normalBuffer = initArrayBufferForLaterUse(gl, new Float32Array(normals), 3, gl.FLOAT);
-    if (texCoords != null) o.texCoordBuffer = initArrayBufferForLaterUse(gl, new Float32Array(texCoords), 2, gl.FLOAT);
-    //you can have error check here
-    o.numVertices = nVertices;
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
-
-    return o;
-}
+var texture={};
+var cameraX,cameraY,cameraZ
+var lightX,lightY,lightZ
+var gl;
+var fbo;
+  
 async function praseModel(file, O) {
 
     response = await fetch(file);
@@ -341,6 +330,8 @@ async function main() {
     }
     tick();
 }
+
+
 function parseOBJ(text) {
     // because indices are base 1 let's just fill in the 0th data
     const objPositions = [[0, 0, 0]];
@@ -489,7 +480,52 @@ function parseOBJ(text) {
         materialLibs,
     };
 }
-
+function parseMTL(text) {
+    const materials = {};
+    let currentMaterial = null;
+    
+    const lines = text.split('\n');
+    for (let line of lines) {
+        line = line.trim();
+        if (line.startsWith('#') || line === '') {
+            continue; // Skip comments and empty lines
+        }
+    
+        const parts = line.split(/\s+/);
+        const keyword = parts[0];
+    
+        switch (keyword) {
+            case 'newmtl': // New material
+                currentMaterial = parts[1];
+                materials[currentMaterial] = {
+                    Ka: [1, 1, 1], // Ambient color default to white
+                    Kd: [1, 1, 1], // Diffuse color default to white
+                    Ks: [1, 1, 1], // Specular color default to white
+                    Ns: 0,         // Specular exponent default to 0
+                    map_Kd: null   // Diffuse texture map
+                };
+                break;
+            case 'Ka': // Ambient color
+                materials[currentMaterial].Ka = parts.slice(1).map(Number);
+                break;
+            case 'Kd': // Diffuse color
+                materials[currentMaterial].Kd = parts.slice(1).map(Number);
+                break;
+            case 'Ks': // Specular color
+                materials[currentMaterial].Ks = parts.slice(1).map(Number);
+                break;
+            case 'Ns': // Specular exponent
+                materials[currentMaterial].Ns = parseFloat(parts[1]);
+                break;
+            case 'map_Kd': // Diffuse texture map
+                // Assuming the texture file is directly available or correctly pathed
+                materials[currentMaterial].map_Kd = parts[1];
+                break;
+        }
+    }
+    
+    return materials;
+}
 
 function mouseUp(ev) {
     mouseDragging = false;
@@ -525,4 +561,36 @@ function scroll(ev) {
         cameraZ -= 0.7;
         // --cameradis;
     }
+}
+function draw_Env_Cube(cameraX,cameraY,cameraZ,vpFromCamera){
+    gl.enable(gl.DEPTH_TEST);
+
+    let rotateMatrix = new Matrix4();
+    rotateMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    rotateMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    var viewDir= new Vector3([cameraDirX, cameraDirY, cameraDirZ]);
+    var newViewDir = rotateMatrix.multiplyVector3(viewDir);
+    if(vpFromCamera == null) vpFromCamera = new Matrix4();
+    //var vpFromCamera = new Matrix4();
+    vpFromCamera.setPerspective(60, 1, 1, 15);
+    var viewMatrixRotationOnly = new Matrix4();
+    viewMatrixRotationOnly.lookAt(cameraX, cameraY, cameraZ, 
+                                    cameraX + newViewDir.elements[0], 
+                                    cameraY + newViewDir.elements[1], 
+                                    cameraZ + newViewDir.elements[2], 
+                                    0, 1, 0);
+    viewMatrixRotationOnly.elements[12] = 0; //ignore translation
+    viewMatrixRotationOnly.elements[13] = 0;
+    viewMatrixRotationOnly.elements[14] = 0;
+    vpFromCamera.multiply(viewMatrixRotationOnly);
+    var vpFromCameraInverse = vpFromCamera.invert();
+    gl.useProgram(programEnvCube);
+    gl.depthFunc(gl.LEQUAL);
+    gl.uniformMatrix4fv(programEnvCube.u_viewDirectionProjectionInverse, 
+                        false, vpFromCameraInverse.elements);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapTex);
+    gl.uniform1i(programEnvCube.u_envCubeMap, 0);
+    initAttributeVariable(gl, programEnvCube.a_Position, quadObj.vertexBuffer);
+    gl.drawArrays(gl.TRIANGLES, 0, quadObj.numVertices);
 }
