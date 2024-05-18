@@ -1,6 +1,6 @@
-const RandomMountain = 5;
-const RandomSight = 15;
-const monsterLeft = 0;
+var RandomMountain = 5;
+var RandomSight = 15;
+var monsterLeft = 0;
 var boss;
 function genarateMapunit() {
     room = new Object();
@@ -130,7 +130,7 @@ function connectMap(idx, idx2, dir) {
 }
 function pushMap(idx, dir) {
     map.push(genarateMapunit())
-    connectMap(idx, map.length() - 1, dir);
+    connectMap(idx, map.length - 1, dir);
 }
 function initMap() {
     map = []

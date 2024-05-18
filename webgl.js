@@ -565,7 +565,7 @@ function draw_player(objComponents,mx,my,mz){
     modelMatrix.setIdentity();
     modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
     modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
-    modelMatrix.translate(mx*0.605,my*0.6-0.9,mz*0.605);
+    modelMatrix.translate((mx-0.5)*0.605,my*0.6-0.9,(mz-0.5)*0.605);
 
     modelMatrix.scale(0.05,0.05,0.05);
 
@@ -624,7 +624,7 @@ function draw(){
         draw_Cube(cubeObj, map[idx].sightObj[i].x-xsz,map[idx].sightObj[i].z-offset,map[idx].sightObj[i].y-ysz,"stone");
     }
     draw_rock(rockObj,lX,5,lZ,"rock");
-    console.log("x,y="+player.location.x+","+player.location.y)
+    //console.log("x,y="+player.location.x+","+player.location.y)
     draw_player(playerObj, player.location.x-8, player.location.z, player.location.y-8 );
     // for(let i = 0; i < 5; i++){
     //     draw_Cube(cubeObj,-1,-1,i,"stone");
