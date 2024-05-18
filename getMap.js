@@ -99,7 +99,7 @@ function genarateMapunit() {
             mobY = Math.floor(Math.random() * room.ySize);
         } while (use[mobX][mobY]);
         use[mobX][mobY] = true;
-        room.mobLocation.push({ x: mobX, y: mobY, z: room.field[mobX][mobY] + 1, type: type });
+        room.mobLocation.push({ x: mobX, y: mobY, z: room.field[mobX][mobY] + 1, type: type, data: createEnemy() });
     }
     return room
 

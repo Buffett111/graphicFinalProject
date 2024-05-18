@@ -1,7 +1,6 @@
 
 var player = {};
-function initGame() {
-    initMap();
+function initPlayer() {
     player.HP = 100;
     player.MAXHP = 100;
     player.LV = 1;
@@ -14,7 +13,13 @@ function initGame() {
     player.speeed = 10;
     player.nowRoom = 0;
     player.getKey = 0;
-    player.location = { x: map[player.nowRoom].xSize/2+0.5, y: map[player.nowRoom].ySize/2+0.5, z: map[player.nowRoom].field[ map[player.nowRoom].xSize/2][ map[player.nowRoom].ySize/2] }
+    player.onBattle = 0;
+    player.location = { x: map[player.nowRoom].xSize / 2 + 0.5, y: map[player.nowRoom].ySize / 2 + 0.5, z: map[player.nowRoom].field[map[player.nowRoom].xSize / 2][map[player.nowRoom].ySize / 2] }
+
+}
+function initGame() {
+    initMap();
+    initPlayer();
 }
 function move(dx, dy) {
     player.location.x += dx
@@ -25,9 +30,9 @@ function move(dx, dy) {
         if (map[player.nowRoom].left === -1)
             pushMap(player.nowRoom, 2)
         player.nowRoom = map[player.nowRoom].left
-        player.location.x = map[player.nowRoom].xSize-0.5 //-0.1
-        
-    } else if (nowplace.x > map[player.nowRoom].xSize-1) {
+        player.location.x = map[player.nowRoom].xSize - 0.5 //-0.1
+
+    } else if (nowplace.x > map[player.nowRoom].xSize - 1) {
         if (map[player.nowRoom].right === -1)
             pushMap(player.nowRoom, 3)
         player.nowRoom = map[player.nowRoom].right
@@ -35,9 +40,9 @@ function move(dx, dy) {
     } else if (nowplace.y < 0) {
         if (map[player.nowRoom].up === -1)
             pushMap(player.nowRoom, 0)
-        player.location.y = map[player.nowRoom].ySize-0.5 //-0.1
+        player.location.y = map[player.nowRoom].ySize - 0.5 //-0.1
         player.nowRoom = map[player.nowRoom].up
-    } else if (nowplace.y > map[player.nowRoom].ySize-1) {
+    } else if (nowplace.y > map[player.nowRoom].ySize - 1) {
         if (map[player.nowRoom].down === -1)
             pushMap(player.nowRoom, 1)
         player.nowRoom = map[player.nowRoom].down
@@ -51,6 +56,11 @@ function move(dx, dy) {
         }
     }
     nowplace = { x: Math.floor(player.location.x), y: Math.floor(player.location.y) }
+    const { x, y } = nowplace;
+    const mob = map[player.nowRoom].mobLocation.find(m => m.x === x && m.y === y);
+    if (mob) {
+        // Handle mob encounter
+    }
     player.location.z = map[player.nowRoom].field[nowplace.x][nowplace.y]
 }
 function regenHP(res) {
@@ -62,7 +72,7 @@ function regenMP(res) {
     if (player.MP > player.MAXMP) player.MP = player.MAXMP;
 }
 function getDamage(atk) {
-    player.HP -= (atk - Math.floor(player.def));
+    player.HP -= Math.max(1, atk - Math.floor(player.def));
     if (player.HP <= 0) {
         return 1;
 
@@ -71,8 +81,10 @@ function getDamage(atk) {
 }
 function getXP(exp) {
     player.exp += exp
-    if (player.exp >= 100) {
-        player.exp -= 100;
+    while (player.exp >= player.LV * 100) {
+        player.exp -= player.LV * 100;
+
+
         player.LV++;
         player.MAXMP += 20;
         player.MAXHP += 20;
