@@ -1,7 +1,7 @@
 const RandomMountain = 5;
 const RandomSight = 15;
-// const RandomSight = 10;
-var boss
+const monsterLeft = 0;
+var boss;
 function genarateMapunit() {
     room = new Object();
     room.xSize = 16;
@@ -90,6 +90,7 @@ function genarateMapunit() {
     room.down = -1
     room.mobLocation = [];
     const n = Math.floor(Math.random() * 8) + 3;
+    monsterLeft += n;
     for (let i = 0; i < n; i++) {
         let mobX, mobY;
         let type = Math.floor(Math.random() * 3) + 1;
@@ -134,6 +135,9 @@ function pushMap(idx, dir) {
 function initMap() {
     map = []
     boss = false
+    RandomMountain = 5;
+    RandomSight = 15;
+    monsterLeft = 0;
     map.push(genarateMapunit())
     // nowMapIndex = 0;
 }
