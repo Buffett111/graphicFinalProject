@@ -1,0 +1,2 @@
+var playerLocation;
+var nowRoom;

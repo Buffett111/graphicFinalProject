@@ -1,5 +1,6 @@
 const RandomMountain = 5;
 const RandomSight = 10;
+// const RandomSight = 10;
 function genarateMapunit() {
     room = new Object();
     room.xSize = 8;
@@ -86,6 +87,18 @@ function genarateMapunit() {
     room.right = -1
     room.up = -1
     room.down = -1
+    room.mobLocation = [];
+    const n = Math.floor(Math.random() * 8) + 3;
+    for (let i = 0; i < n; i++) {
+        let mobX, mobY;
+        let type = Math.floor(Math.random() * 3) + 1;
+        do {
+            mobX = Math.floor(Math.random() * room.xSize);
+            mobY = Math.floor(Math.random() * room.ySize);
+        } while (use[mobX][mobY]);
+        use[mobX][mobY] = true;
+        room.mobLocation.push({ x: mobX, y: mobY, z: room.field[mobX][mobY] + 1, type: type });
+    }
     return room
 
 }
@@ -122,7 +135,8 @@ function initMap() {
     map.push(genarateMapunit())
     // nowMapIndex = 0;
 }
-function main() {
-    initMap();
+function killMonster(idx, x, y) {
+    map[idx].mobLocation = map[idx].mobLocation.filter((mob) => {
+        return !(mob.x === x && mob.y === y && mob.z === z);
+    });
 }
-main()
