@@ -248,32 +248,7 @@ function initFrameBuffer(gl) {
 }
 var mouseLastX, mouseLastY;
 var mouseDragging = false;
-async function main() {
-    canvas = document.getElementById('webgl');
-    gl = canvas.getContext('webgl2');
-    if (!gl) {
-        console.log('Failed to get the rendering context for WebGL');
-        return;
-    }
-    var quad = new Float32Array(
-        [
-            -1, -1, 0,
-            1, -1, 0,
-            -1, 1, 0,
-            -1, 1, 0,
-            1, -1, 0,
-            1, 1, 0
-        ]);
-    quadProgram = compileShader(gl, VSHADER_QUAD_SOURCE, FSHADER_QUAD_SOURCE);
-    quadProgram.a_Position = gl.getAttribLocation(quadProgram, 'a_Position');
-    quadProgram.u_ShadowMap = gl.getUniformLocation(quadProgram, "u_ShadowMap");
-    quadObj = initVertexBufferForLaterUse(gl, quad);
-
-    //setup shaders and prepare shader variables
-    shadowProgram = compileShader(gl, VSHADER_SHADOW_SOURCE, FSHADER_SHADOW_SOURCE);
-    shadowProgram.a_Position = gl.getAttribLocation(shadowProgram, 'a_Position');
-    shadowProgram.u_MvpMatrix = gl.getUniformLocation(shadowProgram, 'u_MvpMatrix');
-
+function initProgram() {
     program = compileShader(gl, VSHADER_SOURCE, FSHADER_SOURCE);
 
     program.a_Position = gl.getAttribLocation(program, 'a_Position');
@@ -292,6 +267,34 @@ async function main() {
     program.u_ShadowMap = gl.getUniformLocation(program, "u_ShadowMap");
     program.u_Color = gl.getUniformLocation(program, 'u_Color');
     program.u_Sampler = gl.getUniformLocation(program, "u_Sampler")
+}
+async function main() {
+    canvas = document.getElementById('webgl');
+    gl = canvas.getContext('webgl2');
+    if (!gl) {
+        console.log('Failed to get the rendering context for WebGL');
+        return;
+    }
+    // var quad = new Float32Array(
+    //     [
+    //         -1, -1, 0,
+    //         1, -1, 0,
+    //         -1, 1, 0,
+    //         -1, 1, 0,
+    //         1, -1, 0,
+    //         1, 1, 0
+    //     ]);
+    // quadProgram = compileShader(gl, VSHADER_QUAD_SOURCE, FSHADER_QUAD_SOURCE);
+    // quadProgram.a_Position = gl.getAttribLocation(quadProgram, 'a_Position');
+    // quadProgram.u_ShadowMap = gl.getUniformLocation(quadProgram, "u_ShadowMap");
+    // quadObj = initVertexBufferForLaterUse(gl, quad);
+    initProgram();
+    //setup shaders and prepare shader variables
+    shadowProgram = compileShader(gl, VSHADER_SHADOW_SOURCE, FSHADER_SHADOW_SOURCE);
+    shadowProgram.a_Position = gl.getAttribLocation(shadowProgram, 'a_Position');
+    shadowProgram.u_MvpMatrix = gl.getUniformLocation(shadowProgram, 'u_MvpMatrix');
+
+
 
     gl.useProgram(program);
 
