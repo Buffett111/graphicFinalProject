@@ -28,6 +28,7 @@ var FSHADER_SOURCE = `
     uniform float u_Ka;
     uniform float u_Kd;
     uniform float u_Ks;
+    uniform float u_Alpha;
     uniform float u_shininess;
     uniform sampler2D u_Sampler;
     uniform vec3 u_Color;
@@ -157,31 +158,59 @@ function compileShader(gl, vShaderText, fShaderText) {
     return program;
 }
 var texture={};
-var cameraX=0,cameraY=0,cameraZ=-5;
+var cameraX=1,cameraY=25,cameraZ=3;
 var cameraDirX=0,cameraDirY=0,cameraDirZ=1;
+var imgNames=[];
+var objCompImgIndex=[];
 
-var camX=0,camY=0,camZ=0;
-var lightX,lightY,lightZ
+var camX=0,camY=10,camZ=0;
+var lightX=0,lightY=10,lightZ=3;
 var angleX=0,angleY=0;
 var gl;
 var fbo;
 var quadObj;
+var cubeObj=[];
+var bushObj;
+var rockObj;
 var offScreenWidth,offScreenHeight=2048;
 var cubeMapTex;
-  
-async function praseModel(file, O) {
-
-    response = await fetch(file);
-    text = await response.text();
-    obj = parseOBJ(text);
-    for (let i = 0; i < obj.geometries.length; i++) {
-        let o = initVertexBufferForLaterUse(gl,
-            obj.geometries[i].data.position,
-            obj.geometries[i].data.normal,
-            obj.geometries[i].data.texcoord);
-        O.push(o);
+var textures = {};
+var texCount=0;
+var numTextures=1;
+var mvpMatrix;
+var modelMatrix; 
+var normalMatrix; 
+var rotateMatrix;
+var objScale=0.3;
+var mouseLastX, mouseLastY;
+var playerObj=[];
+var mouseDragging = false;
+var angle = 0;
+var radius = 5;  // 光源繞圈的半徑
+var lX,lZ;
+var centerX = 0; // 繞圈的中心位置 X
+var centerY = 0; // 繞圈的中心位置 Y
+var speed = 0.01; // 光源轉動的速度
+async function parseModel(file) {
+    try {
+        let response = await fetch(file);
+        let text = await response.text();
+        let obj = parseOBJ(text);
+        let O = [];
+        for (let i = 0; i < obj.geometries.length; i++) {
+            let o = initVertexBufferForLaterUse(gl,
+                obj.geometries[i].data.position,
+                obj.geometries[i].data.normal,
+                obj.geometries[i].data.texcoord);
+            O.push(o);
+        }
+        return O;
+    } catch (error) {
+        console.error('Error loading model:', error);
+        return null;
     }
 }
+
 function onloadTexture(tex, file) {
     var img = new Image();
     img.onload = function () { initTexture(gl, img, tex); };
@@ -199,21 +228,7 @@ function mouseDown(ev) {
     }
 }
 
-function initTexture(gl, img, texKey) {
-    var tex = gl.createTexture();
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
-    gl.bindTexture(gl.TEXTURE_2D, tex);
 
-    // Set the parameters so we can render any size image.
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    // Upload the image into the texture.
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-
-    textures[texKey] = tex;
-
-    texCount++;
-    if (texCount == numTextures) draw();
-}
 
 
 function initFrameBuffer(gl) {
@@ -242,8 +257,7 @@ function initFrameBuffer(gl) {
     frameBuffer.texture = texture;
     return frameBuffer;
 }
-var mouseLastX, mouseLastY;
-var mouseDragging = false;
+
 function initProgram(program) {
     program.a_Position = gl.getAttribLocation(program, 'a_Position');
     program.a_Normal = gl.getAttribLocation(program, 'a_Normal');
@@ -260,6 +274,7 @@ function initProgram(program) {
     program.u_shininess = gl.getUniformLocation(program, 'u_shininess');
     program.u_ShadowMap = gl.getUniformLocation(program, "u_ShadowMap");
     program.u_Color = gl.getUniformLocation(program, 'u_Color');
+    program.u_Alpha = gl.getUniformLocation(program, 'u_Alpha');
     program.u_Sampler = gl.getUniformLocation(program, "u_Sampler")
 }
 async function main() {
@@ -293,10 +308,51 @@ async function main() {
         1,  1, 1
     ]); //just a quad
 
-    
+    //load model;
     quadObj = initVertexBufferForLaterUse(gl, quad);
+    // 調用parseModel函數來載入cube.obj
+    cubeObj=await parseModel('object/cube.obj');
+    //console.log(cubeObj);
+
+    bushObj=await parseModel('object/bushes/01/bush_01.obj');
+    rockObj=await parseModel('object/rocks/01/rock_01.obj');
+    onloadTexture("brick", "texture/brick.jpg")
+    onloadTexture("stone", "texture/stone_wall.png")
+    onloadTexture("bush", "object/bushes/01/diffuse.png");
+    onloadTexture("rock", "object/rocks/01/diffuse.png");
+
+
     cubeMapTex = initCubeTexture("px.png", "nx.png", "py.png", "ny.png", 
                                         "pz.png", "nz.png", 256, 256);
+    response = await fetch('object/sonic-the-hedgehog.mtl');
+    const mtlText = await response.text();
+    //console.log('mtlText'+mtlText)
+    mtl=parseMTL(mtlText);
+
+    imgNames = addTexturesToImgNames(mtl);
+    numTextures= imgNames.length
+
+    response = await fetch('object/sonic.obj');
+    text = await response.text();
+    var obj = parseOBJ(text);
+    objCompImgIndex = parsetexture(text,mtl);
+    for( let i=0; i < obj.geometries.length; i ++ ){
+        let o = initVertexBufferForLaterUse(gl, 
+                                            obj.geometries[i].data.position,
+                                            obj.geometries[i].data.normal, 
+                                            obj.geometries[i].data.texcoord);
+        playerObj.push(o);
+    }
+
+    for( let i=0; i < imgNames.length; i ++ ){
+        let image = new Image();
+        image.onload = function(){initTexture(gl, image, imgNames[i]);};
+        image.src = imgNames[i];
+    }
+
+    console.log(objCompImgIndex)
+    initGame();
+
 
     gl.useProgram(program);
 
@@ -323,43 +379,256 @@ async function main() {
     canvas.onmousedown = function (ev) { mouseDown(ev) };
     canvas.onmousemove = function (ev) { mouseMove(ev) };
     canvas.onmouseup = function (ev) { mouseUp(ev) };
-    canvas.onwheel = function (ev) { scroll(ev) };
+    //canvas.onwheel = function (ev) { scroll(ev) };
     var menu = document.getElementById("menu");
     menu.onchange = function () {
         // if (this.value == "normal") normalMode = true;
         // else normalMode = false;
         draw();
     }
-    document.addEventListener('keydown', (event) => {
-        //event.key
+    document.addEventListener('keydown', function(event) {
+        switch (event.key) {
+            case 'w':
+            case 'W':
+                move(1, 0);
+                break;
+            case 's':
+            case 'S':
+                move(-1, 0);
+                break;
+            case 'a':
+            case 'A':
+                move(0, -1);
+                break;
+            case 'd':
+            case 'D':
+                move(0, 1);
+                break;
+        }
+        draw(); // Redraw the scene with the new camera position
     });
-    // var tick = function () {
-    //     draw();
-    //     requestAnimationFrame(tick);
-    // }
-    // tick();
+    var tick = function () {
+        angle += speed;
+        lX = centerX + radius * Math.cos(angle);
+        lZ = centerY + radius * Math.sin(angle);
+        
+        draw();
+    
+        requestAnimationFrame(tick);
+    }
+    tick();
+}
+function initTexture(gl, img, texKey) {
+    var tex = gl.createTexture();
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+
+    // Set the parameters so we can render any size image.
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    // Upload the image into the texture.
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+
+    textures[texKey] = tex;
+
+    texCount++;
+    //if (texCount == numTextures) draw();
 }
 
-function initVertexBufferForLaterUse(gl, vertices, normals, texCoords){
-    var nVertices = vertices.length / 3;
-    
-    var o = new Object();
-    o.vertexBuffer = initArrayBufferForLaterUse(gl, new Float32Array(vertices), 3, gl.FLOAT);
-    if( normals != null ) o.normalBuffer = initArrayBufferForLaterUse(gl, new Float32Array(normals), 3, gl.FLOAT);
-    if( texCoords != null ) o.texCoordBuffer = initArrayBufferForLaterUse(gl, new Float32Array(texCoords), 2, gl.FLOAT);
-    //you can have error check here
-    o.numVertices = nVertices;
-    
-    gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
-    
-    return o;
-    }
+function addTexturesToImgNames(mtl) {
+let imgNames = [];  // Initialize an array to store the texture file names
 
+// Loop through each key in the mtl dictionary
+for (const materialName in mtl) {
+    if (mtl.hasOwnProperty(materialName) && mtl[materialName].map_Kd) {
+        // Check if the material exists and has a map_Kd property
+        imgNames.push(mtl[materialName].map_Kd);  // Add the map_Kd to the imgNames array
+    }
+}
+
+return imgNames;  // Return the array containing all the map_Kd values
+}
+function draw_rock(objComponents,mx,my,mz,tex){
+    modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    modelMatrix.translate(mx*0.605,my*1.15,mz*0.625);
+    modelMatrix.scale(0.005, 0.005, 0.005);
+    //modelMatrix.scale(0.01, 0.01, 0.01);
+
+    // modelMatrix.translate(0.0, 0.0, -1.0);
+    // modelMatrix.scale(1.0, 0.5, 2.0);
+    //mvp: projection * view * model matrix  
+    mvpMatrix.setPerspective(30, 1, 1, 100);
+    mvpMatrix.lookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
+    mvpMatrix.multiply(modelMatrix);
+
+
+    //normal matrix
+    normalMatrix.setInverseOf(modelMatrix);
+    normalMatrix.transpose();
+
+    gl.useProgram(program);
+    // gl.depthMask(false);
+    gl.uniform3f(program.u_LightPosition, lightX,lightY,lightZ);
+    gl.uniform3f(program.u_ViewPosition, cameraX, cameraY, cameraZ);
+    gl.uniform1f(program.u_Ka, 0.2);
+    gl.uniform1f(program.u_Kd, 0.7);
+    gl.uniform1f(program.u_Ks, 1.0);
+    gl.uniform1f(program.u_shininess, 15.0);
+    gl.uniform1i(program.u_Sampler, 0);
+    gl.uniform1f(program.u_Alpha, 1.0);
+
+    gl.uniformMatrix4fv(program.u_MvpMatrix, false, mvpMatrix.elements);
+    gl.uniformMatrix4fv(program.u_modelMatrix, false, modelMatrix.elements);
+    gl.uniformMatrix4fv(program.u_normalMatrix, false, normalMatrix.elements);
+    //gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, textures[tex]);
+    for( let i=0; i < objComponents.length; i ++ ){
+        initAttributeVariable(gl, program.a_Position, objComponents[i].vertexBuffer);
+        initAttributeVariable(gl, program.a_TexCoord, objComponents[i].texCoordBuffer);
+        initAttributeVariable(gl, program.a_Normal, objComponents[i].normalBuffer);
+        gl.drawArrays(gl.TRIANGLES, 0, objComponents[i].numVertices);
+    }
+    // gl.depthMask(true);
+}
+
+function draw_Cube(objComponents,mx,my,mz,tex){
+        //model Matrix (part of the mvp matrix)
+        modelMatrix.setIdentity();
+        modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+        modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+        modelMatrix.scale(objScale, objScale, objScale);
+        modelMatrix.translate(mx*2,my*2,mz*2);
+
+        // modelMatrix.translate(0.0, 0.0, -1.0);
+        // modelMatrix.scale(1.0, 0.5, 2.0);
+        //mvp: projection * view * model matrix  
+        mvpMatrix.setPerspective(30, 1, 1, 100);
+        mvpMatrix.lookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
+        mvpMatrix.multiply(modelMatrix);
+
+    
+        //normal matrix
+        normalMatrix.setInverseOf(modelMatrix);
+        normalMatrix.transpose();
+
+        gl.useProgram(program);
+    
+        gl.uniform3f(program.u_LightPosition, lightX,lightY,lightZ);
+        gl.uniform3f(program.u_ViewPosition, cameraX, cameraY, cameraZ);
+        gl.uniform1f(program.u_Ka, 0.1);
+        gl.uniform1f(program.u_Kd, 0.2);
+        gl.uniform1f(program.u_Ks, 0.5);
+        gl.uniform1f(program.u_shininess, 15.0);
+        gl.uniform1i(program.u_Sampler, 0);
+        gl.uniform1f(program.u_Alpha, 1.0);
+    
+        gl.uniformMatrix4fv(program.u_MvpMatrix, false, mvpMatrix.elements);
+        gl.uniformMatrix4fv(program.u_modelMatrix, false, modelMatrix.elements);
+        gl.uniformMatrix4fv(program.u_normalMatrix, false, normalMatrix.elements);
+    
+        //gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, textures[tex]);
+        for( let i=0; i < objComponents.length; i ++ ){
+          initAttributeVariable(gl, program.a_Position, objComponents[i].vertexBuffer);
+          initAttributeVariable(gl, program.a_TexCoord, objComponents[i].texCoordBuffer);
+          initAttributeVariable(gl, program.a_Normal, objComponents[i].normalBuffer);
+          gl.drawArrays(gl.TRIANGLES, 0, objComponents[i].numVertices);
+        }
+}
+function parsetexture(text, mtl) {
+    let objCompImgIndex = [];
+    const lines = text.split('\n');  // Split the text into lines
+    
+    lines.forEach(line => {
+        const trimmedLine = line.trim();  // Trim whitespace from the line
+        if (trimmedLine.startsWith('usemtl')) {  // Check if the line starts with "usemtl"
+            const materialName = trimmedLine.split(' ')[1];  // Extract the material name
+            if (mtl[materialName] && mtl[materialName].map_Kd) {
+                // Check if the material exists and has a map_Kd property
+                objCompImgIndex.push(mtl[materialName].map_Kd);  // Add the map_Kd to the array
+            }
+            else{
+                //show error to the console
+                console.error('Material not found:', materialName);
+            }
+        }
+    });
+    
+    return objCompImgIndex;  // Return the array containing the map_Kd values
+}
+function draw_player(objComponents,mx,my,mz){
+    gl.useProgram(program);
+    modelMatrix.setIdentity();
+    modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    modelMatrix.translate(mx*0.605,my*0.6-0.9,mz*0.605);
+
+    modelMatrix.scale(0.05,0.05,0.05);
+
+    mvpMatrix.setPerspective(30, 1, 1, 100);
+    mvpMatrix.lookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
+    mvpMatrix.multiply(modelMatrix);
+
+    //normal matrix
+    normalMatrix.setInverseOf(modelMatrix);
+    normalMatrix.transpose();
+
+    gl.uniform3f(program.u_LightPosition, lightX,lightY,lightZ);
+    gl.uniform3f(program.u_ViewPosition, cameraX, cameraY, cameraZ);
+    gl.uniform1f(program.u_Ka, 0.5);
+    gl.uniform1f(program.u_Kd, 0.7);
+    gl.uniform1f(program.u_Ks, 1.0);
+    gl.uniform1f(program.u_shininess, 15.0);
+    gl.uniform1i(program.u_Sampler, 0);
+    gl.uniform1f(program.u_Alpha, 1.0);
+
+    gl.uniformMatrix4fv(program.u_MvpMatrix, false, mvpMatrix.elements);
+    gl.uniformMatrix4fv(program.u_modelMatrix, false, modelMatrix.elements);
+    gl.uniformMatrix4fv(program.u_normalMatrix, false, normalMatrix.elements);
+
+    for( let i=0; i < objComponents.length; i ++ ){
+        //console.log('mtl:'+mtl)
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, textures[objCompImgIndex[i]]);
+        gl.uniform1i(program.u_Sampler, 0);
+  
+        initAttributeVariable(gl, program.a_Position, objComponents[i].vertexBuffer);
+        initAttributeVariable(gl, program.a_TexCoord, objComponents[i].texCoordBuffer);
+        initAttributeVariable(gl, program.a_Normal, objComponents[i].normalBuffer);
+  
+        gl.drawArrays(gl.TRIANGLES, 0, objComponents[i].numVertices);
+      }
+}
 function draw(){
+    //gl.clearColor(0,0,0,1);
+    idx = player.nowRoom;
+    
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);
     draw_Env_Cube(cameraX,cameraY,cameraZ,null);
-    draw_Cube();
+    var offset=2;
+    var xsz = map[idx].xSize/2;
+    var ysz = map[idx].ySize/2;
+    for(let i = 0; i < map[idx].xSize; i++){
+        for(let j = 0; j < map[idx].ySize; j++){
+            for(let k = 1; k <= map[idx].field[i][j]; ++k){
+                draw_Cube(cubeObj,i-xsz,k-offset,j-ysz,"brick");
+
+            }
+        }
+    }
+    for(let i = 0; i < map[idx].sightObj.length; ++i){
+        draw_Cube(cubeObj, map[idx].sightObj[i].x-xsz,map[idx].sightObj[i].z-offset,map[idx].sightObj[i].y-ysz,"stone");
+    }
+    draw_rock(rockObj,lX,5,lZ,"rock");
+    console.log("x,y="+player.location.x+","+player.location.y)
+    draw_player(playerObj, player.location.x-8, player.location.z, player.location.y-8 );
+    // for(let i = 0; i < 5; i++){
+    //     draw_Cube(cubeObj,-1,-1,i,"stone");
+    // }
 }
 function initCubeTexture(posXName, negXName, posYName, negYName, 
     posZName, negZName, imgWidth, imgHeight)
@@ -627,6 +896,33 @@ function mouseMove(ev) {
 
     draw();
 }
+function moveForward(distance) {
+    //cameraZ += distance * Math.cos(angleX * Math.PI / 180);
+    //cameraX += distance * Math.sin(angleX * Math.PI / 180);
+    cameraX += distance 
+    cameraZ +=distance*3
+}
+
+function moveBackward(distance) {
+    //cameraZ -= distance * Math.cos(angleX * Math.PI / 180);
+    //cameraX -= distance * Math.sin(angleX * Math.PI / 180);
+    cameraX-=distance;
+    cameraZ-=distance*3
+}
+
+function moveLeft(distance) {
+    //cameraX -= distance * Math.cos(angleX * Math.PI / 180);
+    //cameraZ += distance * Math.sin(angleX * Math.PI / 180);
+    cameraX-=distance;
+    cameraZ-=distance*3;
+}
+
+function moveRight(distance) {
+    //cameraX += distance * Math.cos(angleX * Math.PI / 180);
+    //cameraZ -= distance * Math.sin(angleX * Math.PI / 180);
+    cameraX+=distance;
+    cameraZ+=distance*3;
+}
 
 function scroll(ev) {
     // console.log(ev.wheelDelta)
@@ -677,5 +973,4 @@ function draw_Env_Cube(cameraX,cameraY,cameraZ,vpFromCamera){
     gl.uniform1i(programEnvCube.u_envCubeMap, 0);
     initAttributeVariable(gl, programEnvCube.a_Position, quadObj.vertexBuffer);
     gl.drawArrays(gl.TRIANGLES, 0, quadObj.numVertices);
-    console.log("draw env cube");
 }
