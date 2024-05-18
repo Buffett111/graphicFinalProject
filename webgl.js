@@ -183,7 +183,7 @@ var normalMatrix;
 var rotateMatrix;
 var objScale=0.3;
 var mouseLastX, mouseLastY;
-var playerObj;
+var playerObj=[];
 var mouseDragging = false;
 var angle = 0;
 var radius = 5;  // 光源繞圈的半徑
@@ -334,8 +334,23 @@ async function main() {
 
     response = await fetch('object/sonic.obj');
     text = await response.text();
-    playerObj = parseOBJ(text);
+    var obj = parseOBJ(text);
     objCompImgIndex = parsetexture(text,mtl);
+    for( let i=0; i < obj.geometries.length; i ++ ){
+        let o = initVertexBufferForLaterUse(gl, 
+                                            obj.geometries[i].data.position,
+                                            obj.geometries[i].data.normal, 
+                                            obj.geometries[i].data.texcoord);
+        playerObj.push(o);
+    }
+
+    for( let i=0; i < imgNames.length; i ++ ){
+        let image = new Image();
+        image.onload = function(){initTexture(gl, image, imgNames[i]);};
+        image.src = imgNames[i];
+    }
+
+    console.log(objCompImgIndex)
     initGame();
 
 
@@ -375,19 +390,19 @@ async function main() {
         switch (event.key) {
             case 'w':
             case 'W':
-                moveForward(0.2);
+                move(1, 0);
                 break;
             case 's':
             case 'S':
-                moveBackward(0.2);
+                move(-1, 0);
                 break;
             case 'a':
             case 'A':
-                moveLeft(0.2);
+                move(0, -1);
                 break;
             case 'd':
             case 'D':
-                moveRight(0.2);
+                move(0, 1);
                 break;
         }
         draw(); // Redraw the scene with the new camera position
@@ -416,7 +431,7 @@ function initTexture(gl, img, texKey) {
     textures[texKey] = tex;
 
     texCount++;
-    if (texCount == numTextures) draw();
+    //if (texCount == numTextures) draw();
 }
 
 function addTexturesToImgNames(mtl) {
@@ -545,13 +560,14 @@ function parsetexture(text, mtl) {
     
     return objCompImgIndex;  // Return the array containing the map_Kd values
 }
-function draw_player(mx,my,mz){
+function draw_player(objComponents,mx,my,mz){
     gl.useProgram(program);
     modelMatrix.setIdentity();
     modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
     modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
-    modelMatrix.scale(objScale, objScale, objScale);
-    modelMatrix.translate(mx*2,my*2,mz*2);
+    modelMatrix.translate(mx*0.605,my*0.6-0.9,mz*0.605);
+
+    modelMatrix.scale(0.05,0.05,0.05);
 
     mvpMatrix.setPerspective(30, 1, 1, 100);
     mvpMatrix.lookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
@@ -561,20 +577,36 @@ function draw_player(mx,my,mz){
     normalMatrix.setInverseOf(modelMatrix);
     normalMatrix.transpose();
 
-    gl.uniform3f(program.u_LightPosition, 0, 0, 3);
+    gl.uniform3f(program.u_LightPosition, lightX,lightY,lightZ);
     gl.uniform3f(program.u_ViewPosition, cameraX, cameraY, cameraZ);
-    gl.uniform1f(program.u_Ka, 0.2);
+    gl.uniform1f(program.u_Ka, 0.5);
     gl.uniform1f(program.u_Kd, 0.7);
     gl.uniform1f(program.u_Ks, 1.0);
-    gl.uniform1f(program.u_shininess, 10.0);
+    gl.uniform1f(program.u_shininess, 15.0);
+    gl.uniform1i(program.u_Sampler, 0);
+    gl.uniform1f(program.u_Alpha, 1.0);
 
     gl.uniformMatrix4fv(program.u_MvpMatrix, false, mvpMatrix.elements);
     gl.uniformMatrix4fv(program.u_modelMatrix, false, modelMatrix.elements);
     gl.uniformMatrix4fv(program.u_normalMatrix, false, normalMatrix.elements);
+
+    for( let i=0; i < objComponents.length; i ++ ){
+        //console.log('mtl:'+mtl)
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, textures[objCompImgIndex[i]]);
+        gl.uniform1i(program.u_Sampler, 0);
+  
+        initAttributeVariable(gl, program.a_Position, objComponents[i].vertexBuffer);
+        initAttributeVariable(gl, program.a_TexCoord, objComponents[i].texCoordBuffer);
+        initAttributeVariable(gl, program.a_Normal, objComponents[i].normalBuffer);
+  
+        gl.drawArrays(gl.TRIANGLES, 0, objComponents[i].numVertices);
+      }
 }
 function draw(){
     //gl.clearColor(0,0,0,1);
-    idx = 0
+    idx = player.nowRoom;
+    
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);
     draw_Env_Cube(cameraX,cameraY,cameraZ,null);
     var offset=2;
@@ -592,8 +624,8 @@ function draw(){
         draw_Cube(cubeObj, map[idx].sightObj[i].x-xsz,map[idx].sightObj[i].z-offset,map[idx].sightObj[i].y-ysz,"stone");
     }
     draw_rock(rockObj,lX,5,lZ,"rock");
-
-    draw_player(playerObj, playerLocation.x, 1, playerLocation.y, "player");
+    console.log("x,y="+player.location.x+","+player.location.y)
+    draw_player(playerObj, player.location.x-8, player.location.z, player.location.y-8 );
     // for(let i = 0; i < 5; i++){
     //     draw_Cube(cubeObj,-1,-1,i,"stone");
     // }
