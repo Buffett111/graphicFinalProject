@@ -157,10 +157,17 @@ function compileShader(gl, vShaderText, fShaderText) {
     return program;
 }
 var texture={};
-var cameraX,cameraY,cameraZ
+var cameraX=0,cameraY=0,cameraZ=-5;
+var cameraDirX=0,cameraDirY=0,cameraDirZ=1;
+
+var camX=0,camY=0,camZ=0;
 var lightX,lightY,lightZ
+var angleX=0,angleY=0;
 var gl;
 var fbo;
+var quadObj;
+var offScreenWidth,offScreenHeight=2048;
+var cubeMapTex;
   
 async function praseModel(file, O) {
 
@@ -237,9 +244,7 @@ function initFrameBuffer(gl) {
 }
 var mouseLastX, mouseLastY;
 var mouseDragging = false;
-function initProgram() {
-    program = compileShader(gl, VSHADER_SOURCE, FSHADER_SOURCE);
-
+function initProgram(program) {
     program.a_Position = gl.getAttribLocation(program, 'a_Position');
     program.a_Normal = gl.getAttribLocation(program, 'a_Normal');
     program.u_MvpMatrix = gl.getUniformLocation(program, 'u_MvpMatrix');
@@ -264,26 +269,34 @@ async function main() {
         console.log('Failed to get the rendering context for WebGL');
         return;
     }
-    // var quad = new Float32Array(
-    //     [
-    //         -1, -1, 0,
-    //         1, -1, 0,
-    //         -1, 1, 0,
-    //         -1, 1, 0,
-    //         1, -1, 0,
-    //         1, 1, 0
-    //     ]);
-    // quadProgram = compileShader(gl, VSHADER_QUAD_SOURCE, FSHADER_QUAD_SOURCE);
-    // quadProgram.a_Position = gl.getAttribLocation(quadProgram, 'a_Position');
-    // quadProgram.u_ShadowMap = gl.getUniformLocation(quadProgram, "u_ShadowMap");
-    // quadObj = initVertexBufferForLaterUse(gl, quad);
-    initProgram();
+    program = compileShader(gl, VSHADER_SOURCE, FSHADER_SOURCE);
+    initProgram(program);
     //setup shaders and prepare shader variables
     shadowProgram = compileShader(gl, VSHADER_SHADOW_SOURCE, FSHADER_SHADOW_SOURCE);
     shadowProgram.a_Position = gl.getAttribLocation(shadowProgram, 'a_Position');
     shadowProgram.u_MvpMatrix = gl.getUniformLocation(shadowProgram, 'u_MvpMatrix');
 
+    programEnvCube = compileShader(gl, VSHADER_SOURCE_ENVCUBE, FSHADER_SOURCE_ENVCUBE);
+    programEnvCube.a_Position = gl.getAttribLocation(programEnvCube, 'a_Position'); 
+    programEnvCube.u_envCubeMap = gl.getUniformLocation(programEnvCube, 'u_envCubeMap'); 
+    programEnvCube.u_viewDirectionProjectionInverse = 
+               gl.getUniformLocation(programEnvCube, 'u_viewDirectionProjectionInverse'); 
 
+
+    var quad = new Float32Array(
+    [
+        -1, -1, 1,
+        1, -1, 1,
+        -1,  1, 1,
+        -1,  1, 1,
+        1, -1, 1,
+        1,  1, 1
+    ]); //just a quad
+
+    
+    quadObj = initVertexBufferForLaterUse(gl, quad);
+    cubeMapTex = initCubeTexture("px.png", "nx.png", "py.png", "ny.png", 
+                                        "pz.png", "nz.png", 256, 256);
 
     gl.useProgram(program);
 
@@ -292,9 +305,10 @@ async function main() {
 
 
     // onloadTexture('tex', 'location')
-
-    fboShadow = initFrameBuffer(gl);
-    fbo = initFrameBuffer(gl);
+    
+    //fboShadow = initFrameBuffer(gl);
+    //fbo = initFrameBuffer(gl);
+    console.log("done")
     //x,z,y
 
 
@@ -312,26 +326,91 @@ async function main() {
     canvas.onwheel = function (ev) { scroll(ev) };
     var menu = document.getElementById("menu");
     menu.onchange = function () {
-        if (this.value == "normal") normalMode = true;
-        else normalMode = false;
+        // if (this.value == "normal") normalMode = true;
+        // else normalMode = false;
         draw();
     }
     document.addEventListener('keydown', (event) => {
         //event.key
     });
-    var tick = function () {
-        if (coffinY > 0.0000001) coffinY -= 1;
-        coffinY = Math.max(0, coffinY);
-        if (botY > 0.0000001) botY -= 1;
-        botY = Math.max(0, botY);
-        // console.log(botX, botY, botZ);
-        draw();
-        requestAnimationFrame(tick);
-    }
-    tick();
+    // var tick = function () {
+    //     draw();
+    //     requestAnimationFrame(tick);
+    // }
+    // tick();
 }
 
+function initVertexBufferForLaterUse(gl, vertices, normals, texCoords){
+    var nVertices = vertices.length / 3;
+    
+    var o = new Object();
+    o.vertexBuffer = initArrayBufferForLaterUse(gl, new Float32Array(vertices), 3, gl.FLOAT);
+    if( normals != null ) o.normalBuffer = initArrayBufferForLaterUse(gl, new Float32Array(normals), 3, gl.FLOAT);
+    if( texCoords != null ) o.texCoordBuffer = initArrayBufferForLaterUse(gl, new Float32Array(texCoords), 2, gl.FLOAT);
+    //you can have error check here
+    o.numVertices = nVertices;
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+    
+    return o;
+    }
 
+function draw(){
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+    draw_Env_Cube(cameraX,cameraY,cameraZ,null);
+}
+function initCubeTexture(posXName, negXName, posYName, negYName, 
+    posZName, negZName, imgWidth, imgHeight)
+{
+var texture = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
+
+const faceInfos = [
+{
+target: gl.TEXTURE_CUBE_MAP_POSITIVE_X,
+fName: posXName,
+},
+{
+target: gl.TEXTURE_CUBE_MAP_NEGATIVE_X,
+fName: negXName,
+},
+{
+target: gl.TEXTURE_CUBE_MAP_POSITIVE_Y,
+fName: posYName,
+},
+{
+target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Y,
+fName: negYName,
+},
+{
+target: gl.TEXTURE_CUBE_MAP_POSITIVE_Z,
+fName: posZName,
+},
+{
+target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Z,
+fName: negZName,
+},
+];
+faceInfos.forEach((faceInfo) => {
+const {target, fName} = faceInfo;
+// setup each face so it's immediately renderable
+gl.texImage2D(target, 0, gl.RGBA, imgWidth, imgHeight, 0, 
+gl.RGBA, gl.UNSIGNED_BYTE, null);
+
+var image = new Image();
+image.onload = function(){
+gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
+gl.texImage2D(target, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+};
+image.src = fName;
+});
+gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+
+return texture;
+}
 function parseOBJ(text) {
     // because indices are base 1 let's just fill in the 0th data
     const objPositions = [[0, 0, 0]];
@@ -563,6 +642,9 @@ function scroll(ev) {
     }
 }
 function draw_Env_Cube(cameraX,cameraY,cameraZ,vpFromCamera){
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clearColor(0.4, 0.4, 0.4, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
 
     let rotateMatrix = new Matrix4();
@@ -570,7 +652,7 @@ function draw_Env_Cube(cameraX,cameraY,cameraZ,vpFromCamera){
     rotateMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     var viewDir= new Vector3([cameraDirX, cameraDirY, cameraDirZ]);
     var newViewDir = rotateMatrix.multiplyVector3(viewDir);
-    if(vpFromCamera == null) vpFromCamera = new Matrix4();
+    vpFromCamera = new Matrix4();
     //var vpFromCamera = new Matrix4();
     vpFromCamera.setPerspective(60, 1, 1, 15);
     var viewMatrixRotationOnly = new Matrix4();
@@ -587,10 +669,12 @@ function draw_Env_Cube(cameraX,cameraY,cameraZ,vpFromCamera){
     gl.useProgram(programEnvCube);
     gl.depthFunc(gl.LEQUAL);
     gl.uniformMatrix4fv(programEnvCube.u_viewDirectionProjectionInverse, 
-                        false, vpFromCameraInverse.elements);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapTex);
+        false, vpFromCameraInverse.elements);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapTex);
+    // console.log(rotateMatrix.elements);
     gl.uniform1i(programEnvCube.u_envCubeMap, 0);
     initAttributeVariable(gl, programEnvCube.a_Position, quadObj.vertexBuffer);
     gl.drawArrays(gl.TRIANGLES, 0, quadObj.numVertices);
+    console.log("draw env cube");
 }
