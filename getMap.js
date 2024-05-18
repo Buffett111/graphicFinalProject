@@ -1,6 +1,7 @@
 const RandomMountain = 5;
 const RandomSight = 15;
 // const RandomSight = 10;
+var boss
 function genarateMapunit() {
     room = new Object();
     room.xSize = 16;
@@ -132,6 +133,7 @@ function pushMap(idx, dir) {
 }
 function initMap() {
     map = []
+    boss = false
     map.push(genarateMapunit())
     // nowMapIndex = 0;
 }
