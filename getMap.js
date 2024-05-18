@@ -1,10 +1,10 @@
 const RandomMountain = 5;
-const RandomSight = 10;
+const RandomSight = 15;
 // const RandomSight = 10;
 function genarateMapunit() {
     room = new Object();
-    room.xSize = 8;
-    room.ySize = 8;
+    room.xSize = 16;
+    room.ySize = 16;
     room.field = Array.from({ length: room.xSize }, () => Array.from({ length: room.ySize }, () => 1));
     const visited = Array.from({ length: room.xSize }, () => Array.from({ length: room.ySize }, () => false));
     const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]]; // Up, Down, Left, Right
