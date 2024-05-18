@@ -48,6 +48,7 @@ function move(dx, dy) {
             boss = true
         }
     }
+    player.location.z = map[player.nowRoom].field[nowplace.x][nowplace.y]
 }
 function regenHP(res) {
     player.HP += res;
