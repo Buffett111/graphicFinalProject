@@ -359,6 +359,7 @@ function initVertexBufferForLaterUse(gl, vertices, normals, texCoords){
 function draw(){
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);
     draw_Env_Cube(cameraX,cameraY,cameraZ,null);
+    draw_Cube();
 }
 function initCubeTexture(posXName, negXName, posYName, negYName, 
     posZName, negZName, imgWidth, imgHeight)
