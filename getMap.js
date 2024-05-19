@@ -99,8 +99,9 @@ function genarateMapunit() {
             mobY = Math.floor(Math.random() * room.ySize);
         } while (use[mobX][mobY]);
         use[mobX][mobY] = true;
-        room.mobLocation.push({ x: mobX, y: mobY, z: room.field[mobX][mobY] + 1, type: type, data: createEnemy() });
+        room.mobLocation.push({ x: mobX, y: mobY, z: room.field[mobX][mobY] + 1, type: type, data: createEnemy(player.LV) });
     }
+    console.log(room.mobLocation);
     return room
 
 }
@@ -143,6 +144,15 @@ function initMap() {
 }
 function killMonster(idx, x, y) {
     map[idx].mobLocation = map[idx].mobLocation.filter((mob) => {
-        return !(mob.x === x && mob.y === y && mob.z === z);
+        getXP(mob.data.LV)
+        return !(mob.x === x && mob.y === y);
     });
+    player.onBattle = false
+    var enemyS = document.getElementById("enemyStatment");
+    enemyS.type = "text";
+    enemyS.innerHTML = "Enemy:"
+    var attackButton = document.getElementById("attack");
+    attackButton.parentNode.removeChild(attackButton);
+    var runButton = document.getElementById("run");
+    runButton.parentNode.removeChild(runButton);
 }

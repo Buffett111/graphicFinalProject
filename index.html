@@ -8,6 +8,10 @@
 
 <body onload="main()">
     <link rel="stylesheet" href="./style/style.css">
+    <!-- <script>
+        
+        
+    </script> -->
     <canvas id="webgl" width="800" height="800">
         Please use a browser that support "canvas"
     </canvas>
@@ -16,19 +20,10 @@
     <script src="getMap.js"></script>
     <script src="player.js"></script>
     <script src="function.js"></script>
-    <script src="WebGL.js"></script>
-    <select name="menu" id="menu">
-        <option value="normal">Normal</option>
-        <option value="depth">Depth</option>
-      </select>
-    <h3>there init the block locate in randomly<br>
-        press wasd to move the robot<br>
-        press space to jump<br>
-        press r t to rotate the rod<br>
-        press y u to rotate the string<br>
-        scroll to zoom in and zoom out<br>
-        press g to grab the ball<br>
-        drag mouse to rotate camera</h3>
+    <script src="webgl.js"></script>
+    <div id="textbox"></div>
+    <div id="statment"></div>
+    <div id="enemyStatment">Enemy:</div>
 </body>
 
 </html>
