@@ -95,57 +95,62 @@ function initFrameBufferForCubemapRendering(gl) {
     return frameBuffer;
 }
 
-function renderCubeMap(camX, camY, camZ) {
-    //camera 6 direction to render 6 cubemap faces
-    var ENV_CUBE_LOOK_DIR = [
-        [1.0, 0.0, 0.0],
-        [-1.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0],
-        [0.0, -1.0, 0.0],
-        [0.0, 0.0, 1.0],
-        [0.0, 0.0, -1.0]
-    ];
 
-    //camera 6 look up vector to render 6 cubemap faces
-    var ENV_CUBE_LOOK_UP = [
-        [0.0, -1.0, 0.0],
-        [0.0, -1.0, 0.0],
-        [0.0, 0.0, 1.0],
-        [0.0, 0.0, -1.0],
-        [0.0, -1.0, 0.0],
-        [0.0, -1.0, 0.0]
-    ];
+function renderCubeMap(camX, camY, camZ)
+{
+//camera 6 direction to render 6 cubemap faces
+var ENV_CUBE_LOOK_DIR = [
+    [1.0, 0.0, 0.0],
+    [-1.0, 0.0, 0.0],
+    [0.0, 1.0, 0.0],
+    [0.0, -1.0, 0.0],
+    [0.0, 0.0, 1.0],
+    [0.0, 0.0, -1.0]
+  ];
 
-    gl.useProgram(program);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-    gl.viewport(0, 0, offScreenWidth, offScreenHeight);
-    gl.clearColor(0.4, 0.4, 0.4, 1);
-    for (var side = 0; side < 6; side++) {
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
-            gl.TEXTURE_CUBE_MAP_POSITIVE_X + side, fbo.texture, 0);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  //camera 6 look up vector to render 6 cubemap faces
+  var ENV_CUBE_LOOK_UP = [
+    [0.0, -1.0, 0.0],
+    [0.0, -1.0, 0.0],
+    [0.0, 0.0, 1.0],
+    [0.0, 0.0, -1.0],
+    [0.0, -1.0, 0.0],
+    [0.0, -1.0, 0.0]
+  ];
 
-        let vpMatrix = new Matrix4();
-        vpMatrix.setPerspective(90, 1, 1, 100);
-        vpMatrix.lookAt(camX, camY, camZ,
-            camX + ENV_CUBE_LOOK_DIR[side][0],
-            camY + ENV_CUBE_LOOK_DIR[side][1],
-            camZ + ENV_CUBE_LOOK_DIR[side][2],
-            ENV_CUBE_LOOK_UP[side][0],
-            ENV_CUBE_LOOK_UP[side][1],
-            ENV_CUBE_LOOK_UP[side][2]);
+gl.useProgram(program);
 
-        drawRegularObjects(vpMatrix);
-        ///////////////////////////////////////////////////////////
-        gl.useProgram(programEnvCube);
-        var vpFromCameraInverse = vpMatrix.invert();
-        gl.uniformMatrix4fv(programEnvCube.u_viewDirectionProjectionInverse,
-            false, vpFromCameraInverse.elements);
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapTex);
-        gl.uniform1i(programEnvCube.u_envCubeMap, 0);
-        initAttributeVariable(gl, programEnvCube.a_Position, quadObj.vertexBuffer);
-        gl.drawArrays(gl.TRIANGLES, 0, quadObj.numVertices);
+gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+gl.viewport(0, 0, offScreenWidth, offScreenHeight);
+gl.clearColor(0.4, 0.4, 0.4,1);
+for (var side = 0; side < 6;side++){
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, 
+                            gl.TEXTURE_CUBE_MAP_POSITIVE_X+side, fbo.texture, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    let vpMatrix = new Matrix4();
+    vpMatrix.setPerspective(90, 1, 1, 100);
+    vpMatrix.lookAt(camX, camY, camZ,   
+                    camX + ENV_CUBE_LOOK_DIR[side][0], 
+                    camY + ENV_CUBE_LOOK_DIR[side][1],
+                    camZ + ENV_CUBE_LOOK_DIR[side][2], 
+                    ENV_CUBE_LOOK_UP[side][0],
+                    ENV_CUBE_LOOK_UP[side][1],
+                    ENV_CUBE_LOOK_UP[side][2]);
+
+    drawoffscreen(vpMatrix);
+    ///////////////////////////////////////////////////////////
+    gl.useProgram(programEnvCube);
+    gl.depthFunc(gl.LEQUAL);
+    var vpFromCameraInverse=vpMatrix.invert();
+    gl.uniformMatrix4fv(programEnvCube.u_viewDirectionProjectionInverse, 
+    false, vpFromCameraInverse.elements);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapTex);
+    gl.uniform1i(programEnvCube.u_envCubeMap, 0);
+    initAttributeVariable(gl, programEnvCube.a_Position, quadObj.vertexBuffer);
+    gl.drawArrays(gl.TRIANGLES, 0, quadObj.numVertices);
+
 
 
     }

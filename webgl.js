@@ -122,6 +122,39 @@ var FSHADER_SOURCE_ENVCUBE = `
   }
 `;
 
+var VSHADER_SOURCE_TEXTURE_ON_CUBE = `
+  attribute vec4 a_Position;
+  attribute vec4 a_Normal;
+  uniform mat4 u_MvpMatrix;
+  uniform mat4 u_modelMatrix;
+  uniform mat4 u_normalMatrix;
+  varying vec4 v_TexCoord;
+  varying vec3 v_Normal;
+  varying vec3 v_PositionInWorld;
+  void main() {
+    gl_Position = u_MvpMatrix * a_Position;
+    v_TexCoord = a_Position;
+    v_PositionInWorld = (u_modelMatrix * a_Position).xyz; 
+    v_Normal = normalize(vec3(u_normalMatrix * a_Normal));
+  } 
+`;
+
+var FSHADER_SOURCE_TEXTURE_ON_CUBE = `
+  precision mediump float;
+  varying vec4 v_TexCoord;
+  uniform vec3 u_ViewPosition;
+  uniform vec3 u_Color;
+  uniform samplerCube u_envCubeMap;
+  varying vec3 v_Normal;
+  varying vec3 v_PositionInWorld;
+  void main() {
+    vec3 V = normalize(u_ViewPosition - v_PositionInWorld); 
+    vec3 normal = normalize(v_Normal);
+    vec3 R = reflect(-V, normal);
+    gl_FragColor = vec4(0.78 * textureCube(u_envCubeMap, R).rgb + 0.3 * u_Color, 1.0);
+  }
+`;
+
 function compileShader(gl, vShaderText, fShaderText) {
     //////Build vertex and fragment shader objects
     var vertexShader = gl.createShader(gl.VERTEX_SHADER)
@@ -157,22 +190,29 @@ function compileShader(gl, vShaderText, fShaderText) {
 
     return program;
 }
-var texture = {};
-var cameraX = 1, cameraY = 25, cameraZ = 3;
-var cameraDirX = 0, cameraDirY = 0, cameraDirZ = 1;
-var imgNames = [];
-var objCompImgIndex = [];
 
-var camX = 0, camY = 10, camZ = 0;
-var lightX = 0, lightY = 10, lightZ = 3;
-var angleX = 0, angleY = 0;
+var texture={};
+var cameraX=0,cameraY=15,cameraZ=7;
+var cameraX2=0,cameraY2=0,cameraZ2=0;
+var cameraDirX=0,cameraDirY=0,cameraDirZ=-1;
+var imgNames=[];
+var objCompImgIndex=[];
+
+var camX=0,camY=0,camZ=0;
+var lightX=0,lightY=10,lightZ=3;
+var angleX=0,angleY=0;
+
 var gl;
 var fbo;
 var quadObj;
 var cubeObj = [];
 var bushObj;
 var rockObj;
-var offScreenWidth, offScreenHeight = 2048;
+
+var sphereObj;
+//var offScreenWidth=2048,offScreenHeight=2048;
+var offScreenWidth = 256, offScreenHeight = 256; //for cubemap render
+
 var cubeMapTex;
 var textures = {};
 var texCount = 0;
@@ -191,6 +231,8 @@ var lX, lZ;
 var centerX = 0; // 繞圈的中心位置 X
 var centerY = 0; // 繞圈的中心位置 Y
 var speed = 0.01; // 光源轉動的速度
+
+var fbo;
 async function parseModel(file) {
     try {
         let response = await fetch(file);
@@ -295,34 +337,52 @@ async function main() {
     programEnvCube.a_Position = gl.getAttribLocation(programEnvCube, 'a_Position');
     programEnvCube.u_envCubeMap = gl.getUniformLocation(programEnvCube, 'u_envCubeMap');
     programEnvCube.u_viewDirectionProjectionInverse =
-        gl.getUniformLocation(programEnvCube, 'u_viewDirectionProjectionInverse');
 
+    gl.getUniformLocation(programEnvCube, 'u_viewDirectionProjectionInverse');
+
+    programTextureOnCube = compileShader(gl, VSHADER_SOURCE_TEXTURE_ON_CUBE, FSHADER_SOURCE_TEXTURE_ON_CUBE);
+    programTextureOnCube.a_Position = gl.getAttribLocation(programTextureOnCube, 'a_Position'); 
+    programTextureOnCube.a_Normal = gl.getAttribLocation(programTextureOnCube, 'a_Normal'); 
+    programTextureOnCube.u_MvpMatrix = gl.getUniformLocation(programTextureOnCube, 'u_MvpMatrix'); 
+    programTextureOnCube.u_modelMatrix = gl.getUniformLocation(programTextureOnCube, 'u_modelMatrix'); 
+    programTextureOnCube.u_normalMatrix = gl.getUniformLocation(programTextureOnCube, 'u_normalMatrix');
+    programTextureOnCube.u_ViewPosition = gl.getUniformLocation(programTextureOnCube, 'u_ViewPosition');
+    programTextureOnCube.u_envCubeMap = gl.getUniformLocation(programTextureOnCube, 'u_envCubeMap'); 
+    programTextureOnCube.u_Color = gl.getUniformLocation(programTextureOnCube, 'u_Color'); 
 
     var quad = new Float32Array(
         [
-            -1, -1, 1,
-            1, -1, 1,
-            -1, 1, 1,
-            -1, 1, 1,
-            1, -1, 1,
-            1, 1, 1
+          -1, -1, 1,
+          1, -1, 1,
+          -1, 1, 1,
+          -1, 1, 1,
+          1, -1, 1,
+          1, 1, 1
         ]); //just a quad
 
     //load model;
     cubeMapTex = initCubeTexture("px.png", "nx.png", "py.png", "ny.png",
         "pz.png", "nz.png", 256, 256);
     quadObj = initVertexBufferForLaterUse(gl, quad);
+    cubeMapTex = initCubeTexture("pos-x.jpg", "neg-x.jpg", "pos-y.jpg", "neg-y.jpg",
+        "pos-z.jpg", "neg-z.jpg", 512, 512)
+    // cubeMapTex = initCubeTexture("px.png", "nx.png", "py.png", "ny.png",
+    // "pz.png", "nz.png", 256, 256);
     // 調用parseModel函數來載入cube.obj
     cubeObj = await parseModel('object/cube.obj');
     //console.log(cubeObj);
 
-    bushObj = await parseModel('object/bushes/01/bush_01.obj');
-    rockObj = await parseModel('object/rocks/01/rock_01.obj');
+
+    bushObj=await parseModel('object/bushes/01/bush_01.obj');
+    rockObj=await parseModel('object/rocks/01/rock_01.obj');
+    sphereObj=await parseModel('object/sphere.obj');
+
     onloadTexture("brick", "texture/brick.jpg")
     onloadTexture("stone", "texture/stone_wall.png")
     onloadTexture("bush", "object/bushes/01/diffuse.png");
     onloadTexture("rock", "object/rocks/01/diffuse.png");
 
+    fbo = initFrameBufferForCubemapRendering(gl);
 
     response = await fetch('object/sonic-the-hedgehog.mtl');
     const mtlText = await response.text();
@@ -381,11 +441,9 @@ async function main() {
     canvas.onmouseup = function (ev) { mouseUp(ev) };
     //canvas.onwheel = function (ev) { scroll(ev) };
     var menu = document.getElementById("menu");
-    // menu.onchange = function () {
-    //     // if (this.value == "normal") normalMode = true;
-    //     // else normalMode = false;
-    //     draw();
-    // }
+
+    document.addEventListener('keydown', function(event) {
+
     document.addEventListener('keydown', function (event) {
         switch (event.key) {
             case 'w':
@@ -406,6 +464,24 @@ async function main() {
                 break;
         }
         draw(); // Redraw the scene with the new camera position
+        //implment keydown event here
+        // let rotateMatrix = new Matrix4();
+        // rotateMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+        // rotateMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+        // var viewDir= new Vector3([cameraDirX, cameraDirY, cameraDirZ]);
+        // var newViewDir = rotateMatrix.multiplyVector3(viewDir);
+
+        // if(ev.key == 'w'){ 
+        //     cameraX += (newViewDir.elements[0] * 0.1);
+        //     cameraY += (newViewDir.elements[1] * 0.1);
+        //     cameraZ += (newViewDir.elements[2] * 0.1);
+        // }
+        // else if(ev.key == 's'){ 
+        //     cameraX -= (newViewDir.elements[0] * 0.1);
+        //     cameraY -= (newViewDir.elements[1] * 0.1);
+        //     cameraZ -= (newViewDir.elements[2] * 0.1);
+        // }
+        // draw();
     });
     var tick = function () {
         angle += speed;
@@ -447,7 +523,54 @@ function addTexturesToImgNames(mtl) {
 
     return imgNames;  // Return the array containing all the map_Kd values
 }
-function draw_rock(objComponents, mx, my, mz, tex) {
+
+
+function draw_rock_off(objComponents,mx,my,mz,tex,vpMatrix){
+    modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    modelMatrix.translate(mx*0.605,my*1.15,mz*0.625);
+    modelMatrix.scale(0.005, 0.005, 0.005);
+    //modelMatrix.scale(0.01, 0.01, 0.01);
+
+    // modelMatrix.translate(0.0, 0.0, -1.0);
+    // modelMatrix.scale(1.0, 0.5, 2.0);
+    //mvp: projection * view * model matrix  
+    mvpMatrix.set(vpMatrix);
+    mvpMatrix.multiply(modelMatrix);
+
+
+    //normal matrix
+    normalMatrix.setInverseOf(modelMatrix);
+    normalMatrix.transpose();
+
+    gl.useProgram(program);
+    // gl.depthMask(false);
+    gl.uniform3f(program.u_LightPosition, lightX,lightY,lightZ);
+    gl.uniform3f(program.u_ViewPosition, cameraX, cameraY, cameraZ);
+    gl.uniform1f(program.u_Ka, 0.2);
+    gl.uniform1f(program.u_Kd, 0.7);
+    gl.uniform1f(program.u_Ks, 1.0);
+    gl.uniform1f(program.u_shininess, 15.0);
+    gl.uniform1i(program.u_Sampler, 0);
+    gl.uniform1f(program.u_Alpha, 1.0);
+
+    gl.uniformMatrix4fv(program.u_MvpMatrix, false, mvpMatrix.elements);
+    gl.uniformMatrix4fv(program.u_modelMatrix, false, modelMatrix.elements);
+    gl.uniformMatrix4fv(program.u_normalMatrix, false, normalMatrix.elements);
+    //gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, textures[tex]);
+    for( let i=0; i < objComponents.length; i ++ ){
+        initAttributeVariable(gl, program.a_Position, objComponents[i].vertexBuffer);
+        initAttributeVariable(gl, program.a_TexCoord, objComponents[i].texCoordBuffer);
+        initAttributeVariable(gl, program.a_Normal, objComponents[i].normalBuffer);
+        gl.drawArrays(gl.TRIANGLES, 0, objComponents[i].numVertices);
+    }
+    // gl.depthMask(true);
+}
+function draw_rock(objComponents,mx,my,mz,tex,cameraX,cameraY,cameraZ){
+
     modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
     modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     modelMatrix.translate(mx * 0.605, my * 1.15, mz * 0.625);
@@ -492,32 +615,25 @@ function draw_rock(objComponents, mx, my, mz, tex) {
     }
     // gl.depthMask(true);
 }
-
-function draw_Cube(objComponents, mx, my, mz, tex) {
+function draw_Cube_off(objComponents,mx,my,mz,tex,vpMatrix){
     //model Matrix (part of the mvp matrix)
     modelMatrix.setIdentity();
     modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
     modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     modelMatrix.scale(objScale, objScale, objScale);
-    modelMatrix.translate(mx * 2, my * 2, mz * 2);
+    modelMatrix.translate(mx*2,my*2,mz*2);
 
-    // modelMatrix.translate(0.0, 0.0, -1.0);
-    // modelMatrix.scale(1.0, 0.5, 2.0);
-    //mvp: projection * view * model matrix  
-    mvpMatrix.setPerspective(30, 1, 1, 100);
-    mvpMatrix.lookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
+    mvpMatrix.set(vpMatrix);
     mvpMatrix.multiply(modelMatrix);
-
-
+    
     //normal matrix
     normalMatrix.setInverseOf(modelMatrix);
     normalMatrix.transpose();
-
     gl.useProgram(program);
 
-    gl.uniform3f(program.u_LightPosition, lightX, lightY, lightZ);
-    gl.uniform3f(program.u_ViewPosition, cameraX, cameraY, cameraZ);
-    gl.uniform1f(program.u_Ka, 0.1);
+    gl.uniform3f(program.u_LightPosition, lightX,lightY,lightZ);
+    gl.uniform3f(program.u_ViewPosition, cameraX2, cameraY2, cameraZ2);
+    gl.uniform1f(program.u_Ka, 0.5);
     gl.uniform1f(program.u_Kd, 0.2);
     gl.uniform1f(program.u_Ks, 0.5);
     gl.uniform1f(program.u_shininess, 15.0);
@@ -532,12 +648,59 @@ function draw_Cube(objComponents, mx, my, mz, tex) {
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, textures[tex]);
-    for (let i = 0; i < objComponents.length; i++) {
-        initAttributeVariable(gl, program.a_Position, objComponents[i].vertexBuffer);
-        initAttributeVariable(gl, program.a_TexCoord, objComponents[i].texCoordBuffer);
-        initAttributeVariable(gl, program.a_Normal, objComponents[i].normalBuffer);
-        gl.drawArrays(gl.TRIANGLES, 0, objComponents[i].numVertices);
+
+    for( let i=0; i < objComponents.length; i ++ ){
+      initAttributeVariable(gl, program.a_Position, objComponents[i].vertexBuffer);
+      initAttributeVariable(gl, program.a_TexCoord, objComponents[i].texCoordBuffer);
+      initAttributeVariable(gl, program.a_Normal, objComponents[i].normalBuffer);
+      gl.drawArrays(gl.TRIANGLES, 0, objComponents[i].numVertices);
     }
+}
+function draw_Cube(objComponents,mx,my,mz,tex){
+        //model Matrix (part of the mvp matrix)
+        modelMatrix.setIdentity();
+        modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+        modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+        modelMatrix.scale(objScale, objScale, objScale);
+        modelMatrix.translate(mx*2,my*2,mz*2);
+
+        // modelMatrix.translate(0.0, 0.0, -1.0);
+        // modelMatrix.scale(1.0, 0.5, 2.0);
+        //mvp: projection * view * model matrix  
+        mvpMatrix.setPerspective(30, 1, 1, 100);
+        mvpMatrix.lookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
+        mvpMatrix.multiply(modelMatrix);
+
+    
+        //normal matrix
+        normalMatrix.setInverseOf(modelMatrix);
+        normalMatrix.transpose();
+
+        gl.useProgram(program);
+    
+        gl.uniform3f(program.u_LightPosition, lightX,lightY,lightZ);
+        gl.uniform3f(program.u_ViewPosition, cameraX, cameraY, cameraZ);
+        gl.uniform1f(program.u_Ka, 0.1);
+        gl.uniform1f(program.u_Kd, 0.2);
+        gl.uniform1f(program.u_Ks, 0.5);
+        gl.uniform1f(program.u_shininess, 15.0);
+        gl.uniform1i(program.u_Sampler, 0);
+        gl.uniform1f(program.u_Alpha, 1.0);
+    
+        gl.uniformMatrix4fv(program.u_MvpMatrix, false, mvpMatrix.elements);
+        gl.uniformMatrix4fv(program.u_modelMatrix, false, modelMatrix.elements);
+        gl.uniformMatrix4fv(program.u_normalMatrix, false, normalMatrix.elements);
+    
+        //gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, textures[tex]);
+        for( let i=0; i < objComponents.length; i ++ ){
+          initAttributeVariable(gl, program.a_Position, objComponents[i].vertexBuffer);
+          initAttributeVariable(gl, program.a_TexCoord, objComponents[i].texCoordBuffer);
+          initAttributeVariable(gl, program.a_Normal, objComponents[i].normalBuffer);
+          gl.drawArrays(gl.TRIANGLES, 0, objComponents[i].numVertices);
+        }
 }
 function parsetexture(text, mtl) {
     let objCompImgIndex = [];
@@ -560,7 +723,8 @@ function parsetexture(text, mtl) {
 
     return objCompImgIndex;  // Return the array containing the map_Kd values
 }
-function draw_player(objComponents, mx, my, mz) {
+
+function draw_player(objComponents,mx,my,mz,cameraX,cameraY,cameraZ){
     gl.useProgram(program);
     modelMatrix.setIdentity();
     modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
@@ -603,28 +767,64 @@ function draw_player(objComponents, mx, my, mz) {
         gl.drawArrays(gl.TRIANGLES, 0, objComponents[i].numVertices);
     }
 }
-function draw() {
-    //gl.clearColor(0,0,0,1);
-    var statementDiv = document.getElementById('statment');
-    statementDiv.type = "text";
-    // console.log(player.LV)
-    statementDiv.innerHTML = "Player:<br>LV:" + (player.LV).toString() + "(" + player.exp.toString() + ")"
-    statementDiv.innerHTML = statementDiv.innerHTML + "<br>HP:" + player.HP.toString() + "/" + player.MAXHP.toString()
-    statementDiv.innerHTML = statementDiv.innerHTML + "<br>MP:" + player.MP.toString() + "/" + player.MAXMP.toString()
-    statementDiv.innerHTML = statementDiv.innerHTML + "<br>ATK:" + player.atk.toString()
-    statementDiv.innerHTML = statementDiv.innerHTML + "<br>DEF:" + player.def.toString()
-    statementDiv.innerHTML = statementDiv.innerHTML + "<br>SPD:" + player.speed.toString()
-    idx = player.nowRoom;
+function draw_player_off(objComponents,mx,my,mz,vpMatrix){
+    gl.useProgram(program);
+    modelMatrix.setIdentity();
+    modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    modelMatrix.translate((mx-0.5)*0.605,my*0.6-0.9,(mz-0.5)*0.605);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    draw_Env_Cube(cameraX, cameraY, cameraZ, null);
-    var offset = 2;
-    var xsz = map[idx].xSize / 2;
-    var ysz = map[idx].ySize / 2;
-    for (let i = 0; i < map[idx].xSize; i++) {
-        for (let j = 0; j < map[idx].ySize; j++) {
-            for (let k = 1; k <= map[idx].field[i][j]; ++k) {
-                draw_Cube(cubeObj, i - xsz, k - offset, j - ysz, "brick");
+    modelMatrix.scale(0.05,0.05,0.05);
+
+    mvpMatrix.set(vpMatrix);
+    mvpMatrix.multiply(modelMatrix);
+
+    //normal matrix
+    normalMatrix.setInverseOf(modelMatrix);
+    normalMatrix.transpose();
+
+    gl.uniform3f(program.u_LightPosition, lightX,lightY,lightZ);
+    gl.uniform3f(program.u_ViewPosition, cameraX, cameraY, cameraZ);
+    gl.uniform1f(program.u_Ka, 0.5);
+    gl.uniform1f(program.u_Kd, 0.7);
+    gl.uniform1f(program.u_Ks, 1.0);
+    gl.uniform1f(program.u_shininess, 15.0);
+    gl.uniform1i(program.u_Sampler, 0);
+    gl.uniform1f(program.u_Alpha, 1.0);
+
+    gl.uniformMatrix4fv(program.u_MvpMatrix, false, mvpMatrix.elements);
+    gl.uniformMatrix4fv(program.u_modelMatrix, false, modelMatrix.elements);
+    gl.uniformMatrix4fv(program.u_normalMatrix, false, normalMatrix.elements);
+
+    for( let i=0; i < objComponents.length; i ++ ){
+        //console.log('mtl:'+mtl)
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, textures[objCompImgIndex[i]]);
+        gl.uniform1i(program.u_Sampler, 0);
+  
+        initAttributeVariable(gl, program.a_Position, objComponents[i].vertexBuffer);
+        initAttributeVariable(gl, program.a_TexCoord, objComponents[i].texCoordBuffer);
+        initAttributeVariable(gl, program.a_Normal, objComponents[i].normalBuffer);
+  
+        gl.drawArrays(gl.TRIANGLES, 0, objComponents[i].numVertices);
+      }
+}
+function draw(){
+    // gl.clearColor(0,0,0,1);
+    // draw_Env_Cube(cameraX,cameraY,cameraZ);
+    
+    idx = player.nowRoom;
+    renderCubeMap(0,0,0);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+
+
+    var offset=2;
+    var xsz = map[idx].xSize/2;
+    var ysz = map[idx].ySize/2;
+    for(let i = 0; i < map[idx].xSize; i++){
+        for(let j = 0; j < map[idx].ySize; j++){
+            for(let k = 1; k <= map[idx].field[i][j]; ++k){
+                draw_Cube(cubeObj,i-xsz,k-offset,j-ysz,"brick");
 
             }
         }
@@ -632,6 +832,99 @@ function draw() {
     for (let i = 0; i < map[idx].sightObj.length; ++i) {
         draw_Cube(cubeObj, map[idx].sightObj[i].x - xsz, map[idx].sightObj[i].z - offset, map[idx].sightObj[i].y - ysz, "stone");
     }
+
+    draw_rock(rockObj,lX,5,lZ,"rock",cameraX,cameraY,cameraZ);
+    //console.log("x,y="+player.location.x+","+player.location.y)
+    draw_player(playerObj, player.location.x-8, player.location.z, player.location.y-8,cameraX,cameraY,cameraZ );
+   
+    for(let i = 0; i < 5; i++){
+        draw_Cube(cubeObj,-1,-1,i,"stone");
+    }
+    // gl.clearColor(0,0,0,1);
+    // gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    let rotateMatrix = new Matrix4();
+    rotateMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    rotateMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    var viewDir= new Vector3([cameraDirX, cameraDirY, cameraDirZ]);
+    var newViewDir = rotateMatrix.multiplyVector3(viewDir);
+    let vpMatrix = new Matrix4();
+    vpMatrix.setPerspective(90, 1, 1, 100);
+    vpMatrix.lookAt(cameraX, cameraY, cameraZ,
+        cameraX + newViewDir.elements[0],
+        cameraY + newViewDir.elements[1],
+        cameraZ + newViewDir.elements[2],
+        0, 1, 0);
+//         vpMatrix.elements[12] = 0; //ignore translation
+//   vpMatrix.elements[13] = 0;
+//   vpMatrix.elements[14] = 0;
+      //the sphere
+    let mdlMatrix = new Matrix4();
+    mdlMatrix.setIdentity();
+    mdlMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    mdlMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    mdlMatrix.scale(objScale, objScale, objScale);
+    mdlMatrix.translate(-8*0,7,8*0);
+    //mdlMatrix.setScale(0.5, 0.5, 0.5);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+    vpMatrix.setPerspective(30, 1, 1, 100);
+    vpMatrix.lookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
+    drawObjectWithDynamicReflection(sphereObj, mdlMatrix, vpMatrix, 0.95, 0.85, 0.4);
+
+    draw_Env_Cube(cameraX,cameraY,cameraZ);
+
+}
+
+function drawObjectWithDynamicReflection(obj, modelMatrix, vpMatrix, colorR, colorG, colorB){
+    gl.useProgram(programTextureOnCube);
+    let mvpMatrix = new Matrix4();
+    let normalMatrix = new Matrix4();
+    mvpMatrix.set(vpMatrix);
+    mvpMatrix.multiply(modelMatrix);
+  
+    //normal matrix
+    normalMatrix.setInverseOf(modelMatrix);
+    normalMatrix.transpose();
+  
+    gl.uniform3f(programTextureOnCube.u_ViewPosition, cameraX, cameraY, cameraZ);
+    gl.uniform3f(programTextureOnCube.u_Color, colorR, colorG, colorB);
+  
+    gl.uniformMatrix4fv(programTextureOnCube.u_MvpMatrix, false, mvpMatrix.elements);
+    gl.uniformMatrix4fv(programTextureOnCube.u_modelMatrix, false, modelMatrix.elements);
+    gl.uniformMatrix4fv(programTextureOnCube.u_normalMatrix, false, normalMatrix.elements);
+  
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, fbo.texture);
+    gl.uniform1i(programTextureOnCube.u_envCubeMap, 0);
+  
+    for( let i=0; i < obj.length; i ++ ){
+      initAttributeVariable(gl, programTextureOnCube.a_Position, obj[i].vertexBuffer);
+      initAttributeVariable(gl, programTextureOnCube.a_Normal, obj[i].normalBuffer);
+      gl.drawArrays(gl.TRIANGLES, 0, obj[i].numVertices);
+    }
+  }
+function drawoffscreen(vpMatrix){
+    //gl.clearColor(0,0,0,1);
+    gl.enable(gl.DEPTH_TEST);
+    idx = player.nowRoom;
+    gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+    draw_Env_Cube(cameraX2,cameraY2,cameraZ2,null);
+    var offset=2;
+    var xsz = map[idx].xSize/2;
+    var ysz = map[idx].ySize/2;
+    for(let i = 0; i < map[idx].xSize; i++){
+        for(let j = 0; j < map[idx].ySize; j++){
+            for(let k = 1; k <= map[idx].field[i][j]; ++k){
+                draw_Cube_off(cubeObj,i-xsz,k-offset,j-ysz,"brick",vpMatrix);
+
+            }
+        }
+    }
+    for(let i = 0; i < map[idx].sightObj.length; ++i){
+        draw_Cube_off(cubeObj, map[idx].sightObj[i].x-xsz,map[idx].sightObj[i].z-offset,map[idx].sightObj[i].y-ysz,"stone",vpMatrix);
+    }
+    draw_rock_off(rockObj,lX,5,lZ,"rock",vpMatrix);
+    //console.log("x,y="+player.location.x+","+player.location.y)
+    draw_player_off(playerObj, player.location.x-8, player.location.z, player.location.y-8,vpMatrix);
     draw_rock(rockObj, lX, 5, lZ, "rock");
     //console.log("x,y="+player.location.x+","+player.location.y)
     draw_player(playerObj, player.location.x - 8, player.location.z, player.location.y - 8);
@@ -689,6 +982,7 @@ function initCubeTexture(posXName, negXName, posYName, negYName,
 
     return texture;
 }
+
 function parseOBJ(text) {
     // because indices are base 1 let's just fill in the 0th data
     const objPositions = [[0, 0, 0]];
@@ -946,26 +1240,26 @@ function scroll(ev) {
         // --cameradis;
     }
 }
-function draw_Env_Cube(cameraX, cameraY, cameraZ, vpFromCamera) {
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.clearColor(0.4, 0.4, 0.4, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    gl.enable(gl.DEPTH_TEST);
 
+function draw_Env_Cube(cameraX,cameraY,cameraZ,vpFromCamera){
+    gl.enable(gl.DEPTH_TEST);
+    
     let rotateMatrix = new Matrix4();
     rotateMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
     rotateMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     var viewDir = new Vector3([cameraDirX, cameraDirY, cameraDirZ]);
     var newViewDir = rotateMatrix.multiplyVector3(viewDir);
-    vpFromCamera = new Matrix4();
+     vpFromCamera = new Matrix4();
     //var vpFromCamera = new Matrix4();
     vpFromCamera.setPerspective(60, 1, 1, 15);
     var viewMatrixRotationOnly = new Matrix4();
-    viewMatrixRotationOnly.lookAt(cameraX, cameraY, cameraZ,
-        cameraX + newViewDir.elements[0],
-        cameraY + newViewDir.elements[1],
-        cameraZ + newViewDir.elements[2],
-        0, 1, 0);
+
+    viewMatrixRotationOnly.lookAt(cameraX, cameraY, cameraZ, 
+                                  cameraX + newViewDir.elements[0], 
+                                  cameraY + newViewDir.elements[1], 
+                                  cameraZ + newViewDir.elements[2], 
+                                  0, 1, 0);
+
     viewMatrixRotationOnly.elements[12] = 0; //ignore translation
     viewMatrixRotationOnly.elements[13] = 0;
     viewMatrixRotationOnly.elements[14] = 0;
@@ -973,12 +1267,13 @@ function draw_Env_Cube(cameraX, cameraY, cameraZ, vpFromCamera) {
     var vpFromCameraInverse = vpFromCamera.invert();
     gl.useProgram(programEnvCube);
     gl.depthFunc(gl.LEQUAL);
-    gl.uniformMatrix4fv(programEnvCube.u_viewDirectionProjectionInverse,
-        false, vpFromCameraInverse.elements);
+
+    gl.uniformMatrix4fv(programEnvCube.u_viewDirectionProjectionInverse, 
+                        false, vpFromCameraInverse.elements);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapTex);
-    // console.log(rotateMatrix.elements);
+
     gl.uniform1i(programEnvCube.u_envCubeMap, 0);
     initAttributeVariable(gl, programEnvCube.a_Position, quadObj.vertexBuffer);
     gl.drawArrays(gl.TRIANGLES, 0, quadObj.numVertices);
-}
+  }
