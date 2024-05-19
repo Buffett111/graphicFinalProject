@@ -1,0 +1,65 @@
+@font-face {
+    font-family: 'DigitalJots';
+    src: url('../object/DigitalJots.ttf');
+}
+
+body {
+    font-family: 'DigitalJots', sans-serif;
+    font-size: 50px;
+    #textbox {
+        width: 500px;
+        height: 200px;
+        background-color: lightgray;
+        border: 1px solid gray;
+        padding: 10px;
+        box-sizing: border-box;
+        position: absolute;
+        left: 850px;
+        top: 10px;
+    }
+    #statment {
+        width: 300px;
+        height: 200px;
+        /* background-color: lightgray;
+        border: 1px solid gray; */
+        padding: 10px;
+        box-sizing: border-box;
+        position: absolute;
+        left: 850px;
+        top: 350px;
+    }
+    #enemyStatment {
+        width: 300px;
+        height: 200px;
+        /* background-color: lightgray;
+        border: 1px solid gray; */
+        padding: 10px;
+        box-sizing: border-box;
+        position: absolute;
+        left: 1150px;
+        top: 350px;
+    }
+    button {
+        font-family: 'DigitalJots', sans-serif;
+        font-size: 100%;
+        
+    }
+    #attack {
+        width: 300px;
+        height: 130px;
+        position: absolute;
+        top: 220px;
+        left: 850px;
+    
+    }
+    #run {
+        width: 300px;
+        height: 130px;
+        position: absolute;
+        top: 220px;
+        left: 1150px;
+    }
+}
+
+/* button { */
+/* } */
