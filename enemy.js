@@ -2,9 +2,9 @@ function createEnemy(lv) {
     var enemy = new Object()
     console.log(lv)
     enemy.LV = Math.floor(Math.random() * (100 - lv)) + lv;
-    enemy.HP = 100 + 20 * enemy.LV;
+    enemy.HP = 100 + 5 * enemy.LV;
     enemy.atk = 4 + 2 * Math.floor(enemy.LV / 3);
-    enemy.def = Math.floor(enemy.LV / 5);
+    enemy.def = Math.floor(enemy.LV / 8);
     enemy.speeed = 10 + Math.floor(enemy.LV / 10);
     enemy.getDamage = (atk) => {
         enemy.HP -= Math.max(1, atk - Math.floor(enemy.def));
