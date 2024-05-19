@@ -1,6 +1,7 @@
 
 var player = {};
 function initPlayer() {
+    player.direction=1;
     player.live=1;
     player.HP = 100;
     player.MAXHP = 100;
@@ -91,18 +92,31 @@ function move(dx, dy) {
         enemyS.innerHTML = enemyS.innerHTML + "<br>DEF:" + nowEnemy.def.toString()
         enemyS.innerHTML = enemyS.innerHTML + "<br>SPD:" + nowEnemy.speeed.toString()
 
+        // Create the attack button
         var attackButton = document.createElement("button");
-        attackButton.innerHTML = "Attack";
+        var attackImg = document.createElement("img");
+        attackImg.src = "texture/attack.png";
+        attackImg.width = "120";
+        
+        attackImg.alt = "Attack";
+        attackButton.appendChild(attackImg);
         attackButton.id = "attack";
         attackButton.addEventListener("click", attackEnemy);
         document.body.appendChild(attackButton);
 
+        // Create the run button
         var runButton = document.createElement("button");
-        runButton.innerHTML = "Run";
+        var runImg = document.createElement("img");
+        runImg.src = "texture/run.png";
+        runImg.width = "120";
+        runImg.alt = "Run";
+        runButton.appendChild(runImg);
         runButton.id = "run";
         runButton.addEventListener("click", run);
         document.body.appendChild(runButton);
+
         console.log('find enemy');
+
 
 
     }
