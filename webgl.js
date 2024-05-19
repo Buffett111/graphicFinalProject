@@ -190,7 +190,9 @@ function compileShader(gl, vShaderText, fShaderText) {
 
     return program;
 }
-
+var playerModel=new Matrix4();
+var playervp = new Matrix4();
+var playernormal = new Matrix4();
 var texture = {};
 var cameraX = 0, cameraY = 15, cameraZ = 7;
 cameraY = 20
@@ -320,6 +322,17 @@ function initProgram(program) {
     program.u_Alpha = gl.getUniformLocation(program, 'u_Alpha');
     program.u_Sampler = gl.getUniformLocation(program, "u_Sampler")
 }
+
+function updatePlayerModelMatrix() {
+    // Update the model matrix with the player's location
+    var tmp=playerModel.multiply([player.location.x-8,player.location.z,player.location.y-8,1]);
+    cameraX=tmp[0];
+    cameraY=tmp[1];
+    cameraZ=tmp[2];
+    // Apply any rotations or additional transformations based on player's direction
+    modelMatrix.rotate(player.direction, 0, 1, 0);
+}
+
 async function main() {
     canvas = document.getElementById('webgl');
     gl = canvas.getContext('webgl2');
@@ -454,22 +467,22 @@ async function main() {
             case 'w':
             case 'W':
                 move(1, 0);
-                player.direction = 1;
+                player.direction = 0;
                 break;
             case 's':
             case 'S':
                 move(-1, 0);
-                player.direction = 3;
+                player.direction = 180;
                 break;
             case 'a':
             case 'A':
                 move(0, -1);
-                player.direction = 4;
+                player.direction = 270;
                 break;
             case 'd':
             case 'D':
                 move(0, 1);
-                player.direction = 2;
+                player.direction = 90;
                 break;
             case 'f':
             case 'F':
@@ -870,7 +883,7 @@ function draw_player(objComponents, mx, my, mz, cameraX, cameraY, cameraZ, mvpFr
     modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
     modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     modelMatrix.translate((mx - 0.5) * 0.605, my * 0.6 - 0.9, (mz - 0.5) * 0.605);
-
+    playerModel.set(modelMatrix);
     modelMatrix.scale(0.05, 0.05, 0.05);
 
     mvpMatrix.setPerspective(30, 1, 1, 100);
