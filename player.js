@@ -1,8 +1,8 @@
 
 var player = {};
 function initPlayer() {
-    player.direction=1;
-    player.live=1;
+    player.direction = 1;
+    player.live = 1;
     player.HP = 100;
     player.MAXHP = 100;
     player.LV = 1;
@@ -11,7 +11,7 @@ function initPlayer() {
     player.atk = 10;
     player.def = 0;
     player.MP = 100;
-    player.MAXMP=100;
+    player.MAXMP = 100;
     player.speed = 10;
     player.nowRoom = 0;
     player.getKey = 0;
@@ -19,7 +19,7 @@ function initPlayer() {
 
 }
 function initGame() {
-    gameover=false;
+    gameover = false;
     initPlayer();
     initMap();
     player.location = { x: map[player.nowRoom].xSize / 2 + 0.5, y: map[player.nowRoom].ySize / 2 + 0.5, z: map[player.nowRoom].field[map[player.nowRoom].xSize / 2][map[player.nowRoom].ySize / 2] }
@@ -97,7 +97,7 @@ function move(dx, dy) {
         var attackImg = document.createElement("img");
         attackImg.src = "texture/attack.png";
         attackImg.width = "120";
-        
+
         attackImg.alt = "Attack";
         attackButton.appendChild(attackImg);
         attackButton.id = "attack";
@@ -182,7 +182,7 @@ function attackEnemy() {
         killMonster(player.nowRoom, nowplace.x, nowplace.y);
         return;
     } else {
-        textBox.innerHTML="";
+        textBox.innerHTML = "";
         textBox.innerHTML = textBox.innerHTML + "<br>ATTACK!<br>You attack " + Math.max(1, player.atk - Math.floor(map[player.nowRoom].mobLocation[i].data.def)).toString() + " hp";
         //addMessage("ATTACK!<br>You attack " + Math.max(1, player.atk - Math.floor(map[player.nowRoom].mobLocation[i].data.def)).toString() + " hp");
         enemy_attack()
