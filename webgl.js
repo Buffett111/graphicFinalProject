@@ -812,7 +812,7 @@ function draw(){
     // draw_Env_Cube(cameraX,cameraY,cameraZ);
     
     idx = player.nowRoom;
-    renderCubeMap(cameraX2,cameraY2,cameraZ2);
+    renderCubeMap(0,0,0);
     gl.viewport(0, 0, canvas.width, canvas.height);
 
 
@@ -860,7 +860,7 @@ function draw(){
     mdlMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
     mdlMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     mdlMatrix.scale(objScale, objScale, objScale);
-    mdlMatrix.translate(-lX*2,7,lZ*2);
+    mdlMatrix.translate(-8*0,7,8*0);
     //mdlMatrix.setScale(0.5, 0.5, 0.5);
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);
     vpMatrix.setPerspective(30, 1, 1, 100);
