@@ -191,18 +191,19 @@ function compileShader(gl, vShaderText, fShaderText) {
     return program;
 }
 
-var texture={};
-var cameraX=0,cameraY=15,cameraZ=7;
-var TcX=0,TcY=15,TcZ=7;
+var texture = {};
+var cameraX = 0, cameraY = 15, cameraZ = 7;
+cameraY = 20
+var TcX = 0, TcY = 15, TcZ = 7;
 var firstPersonView = true;
-var cameraX2=0,cameraY2=0,cameraZ2=0;
-var cameraDirX=0,cameraDirY=0,cameraDirZ=-1;
-var imgNames=[];
-var objCompImgIndex=[];
-var gameover=false;
-var camX=0,camY=0,camZ=0;
-var lightX=0,lightY=10,lightZ=3;
-var angleX=0,angleY=0;
+var cameraX2 = 0, cameraY2 = 0, cameraZ2 = 0;
+var cameraDirX = 0, cameraDirY = 0, cameraDirZ = -1;
+var imgNames = [];
+var objCompImgIndex = [];
+var gameover = false;
+var camX = 0, camY = 0, camZ = 0;
+var lightX = 0, lightY = 10, lightZ = 3;
+var angleX = 0, angleY = 0;
 
 var gl;
 var fbo;
@@ -453,22 +454,22 @@ async function main() {
             case 'w':
             case 'W':
                 move(1, 0);
-                player.direction=1;
+                player.direction = 1;
                 break;
             case 's':
             case 'S':
                 move(-1, 0);
-                player.direction=3;
+                player.direction = 3;
                 break;
             case 'a':
             case 'A':
                 move(0, -1);
-                player.direction=4;
+                player.direction = 4;
                 break;
             case 'd':
             case 'D':
                 move(0, 1);
-                player.direction=2;
+                player.direction = 2;
                 break;
             case 'f':
             case 'F':
@@ -536,21 +537,21 @@ function switchToFirstPersonView() {
     let centerX = eyeX + Math.cos(player.direction);
     let centerY = eyeY + Math.sin(player.direction);
     let centerZ = eyeZ;
-    Tcx=cameraX;
-    Tcy=cameraY;
-    Tcz=cameraZ;
-    cameraX=eyeX;
-    cameraY=eyeY;
-    cameraZ=eyeZ;
+    Tcx = cameraX;
+    Tcy = cameraY;
+    Tcz = cameraZ;
+    cameraX = eyeX;
+    cameraY = eyeY;
+    cameraZ = eyeZ;
 
     viewMatrix.setLookAt(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, 0, 0, 1);
 }
 
 function switchToOldCameraView() {
     // 恢復舊的相機位置
-    cameraX=TcX;
-    cameraY=TcY;
-    cameraZ=TcZ;
+    cameraX = TcX;
+    cameraY = TcY;
+    cameraZ = TcZ;
     viewMatrix.setLookAt(TcX, TcY, TcZ, player.location.x, player.location.y, player.location.z, 0, 0, 1);
 }
 
@@ -914,8 +915,8 @@ function draw_enemy(objComponents, mx, my, mz, cameraX, cameraY, cameraZ, tex, m
     modelMatrix.setIdentity();
     modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
     modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
-    modelMatrix.translate((mx + 0.0) * 0.65, my * 0.6 - 0.5, (mz - 0.0) * 0.605);
-    //modelMatrix.scale(0.5, 0.5, 0.5);
+    modelMatrix.translate(mx * 0.6, my * 0.6 - 1, mz * 0.6);
+    modelMatrix.scale(0.5, 0.5, 0.5);
 
     mvpMatrix.setPerspective(30, 1, 1, 100);
     mvpMatrix.lookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
@@ -1038,8 +1039,8 @@ function draw() {
     // gl.clearColor(0,0,0,1);
     // draw_Env_Cube(cameraX,cameraY,cameraZ);
 
-    if(gameover){
-        gl.clearColor(0,0,0,1);
+    if (gameover) {
+        gl.clearColor(0, 0, 0, 1);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         return;
     }
@@ -1179,7 +1180,8 @@ function draw_enemy_offShadow(objComponents, mx, my, mz) {
     modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
     modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     //modelMatrix.translate((mx - 0.5) * 0.66, my * 0.6 - 0.9, (mz - 0.5) * 0.68-0.2);
-    modelMatrix.translate((mx + 0.0) * 0.65, my * 0.6 - 0.5, (mz - 0.0) * 0.605);
+    modelMatrix.translate(mx * 0.6, my * 0.6 - 1, mz * 0.6);
+    modelMatrix.scale(0.5, 0.5, 0.5);
     //modelMatrix.scale(0.5, 0.5, 0.5);
 
     var mvpFromLight = new Matrix4();
