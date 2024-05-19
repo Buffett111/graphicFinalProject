@@ -1,6 +1,7 @@
 
 var player = {};
 function initPlayer() {
+    player.live=1;
     player.HP = 100;
     player.MAXHP = 100;
     player.LV = 1;
@@ -8,8 +9,8 @@ function initPlayer() {
     //expreq = floor(1<<0.3lv) + delta
     player.atk = 10;
     player.def = 0;
-    player.MAXMP = 100;
     player.MP = 100;
+    player.MAXMP=100;
     player.speed = 10;
     player.nowRoom = 0;
     player.getKey = 0;
@@ -17,6 +18,7 @@ function initPlayer() {
 
 }
 function initGame() {
+    gameover=false;
     initPlayer();
     initMap();
     player.location = { x: map[player.nowRoom].xSize / 2 + 0.5, y: map[player.nowRoom].ySize / 2 + 0.5, z: map[player.nowRoom].field[map[player.nowRoom].xSize / 2][map[player.nowRoom].ySize / 2] }
@@ -129,8 +131,8 @@ function getXP(exp) {
         player.LV++;
         player.MAXMP += 20;
         player.MAXHP += 20;
-        player.atk += 1;
-        player.def += 0.2;
+        player.atk += 2;
+        player.def += 0.5;
         player.speeed += 0.5;
         player.HP = player.MAXHP;
         player.MP = player.MAXMP;
@@ -166,8 +168,10 @@ function attackEnemy() {
         killMonster(player.nowRoom, nowplace.x, nowplace.y);
         return;
     } else {
+        textBox.innerHTML="";
         textBox.innerHTML = textBox.innerHTML + "<br>ATTACK!<br>You attack " + Math.max(1, player.atk - Math.floor(map[player.nowRoom].mobLocation[i].data.def)).toString() + " hp";
-
+        //addMessage("ATTACK!<br>You attack " + Math.max(1, player.atk - Math.floor(map[player.nowRoom].mobLocation[i].data.def)).toString() + " hp");
+        enemy_attack()
     }
     if (player.speed >= map[player.nowRoom].mobLocation[index].data.speed) {
         textBox.innerHTML = textBox.innerHTML + "<br>GET DAMAGE!<br>You get " + Math.max(1, player.atk - Math.floor(map[player.nowRoom].mobLocation[i].data.def)).toString() + " damage";
@@ -189,5 +193,6 @@ function run() {
     } else {
         console.log('fail')
         textBox.textContent = "run fail";
+        enemy_attack()
     }
 }
