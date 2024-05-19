@@ -190,16 +190,18 @@ function compileShader(gl, vShaderText, fShaderText) {
 
     return program;
 }
-var texture = {};
-var cameraX = 0, cameraY = 15, cameraZ = 7;
-var cameraX2 = 0, cameraY2 = 0, cameraZ2 = 0;
-var cameraDirX = 0, cameraDirY = 0, cameraDirZ = -1;
-var imgNames = [];
-var objCompImgIndex = [];
 
-var camX = 0, camY = 0, camZ = 0;
-var lightX = 0, lightY = 10, lightZ = 3;
-var angleX = 0, angleY = 0;
+var texture={};
+var cameraX=0,cameraY=15,cameraZ=7;
+var cameraX2=0,cameraY2=0,cameraZ2=0;
+var cameraDirX=0,cameraDirY=0,cameraDirZ=-1;
+var imgNames=[];
+var objCompImgIndex=[];
+var gameover=false;
+var camX=0,camY=0,camZ=0;
+var lightX=0,lightY=10,lightZ=3;
+var angleX=0,angleY=0;
+
 var gl;
 var fbo;
 var quadObj;
@@ -421,7 +423,7 @@ async function main() {
 
     //fboShadow = initFrameBuffer(gl);
     //fbo = initFrameBuffer(gl);
-    console.log("done")
+    //console.log("done")
     //x,z,y
 
 
@@ -986,13 +988,21 @@ function draw() {
     statementDiv.type = "text";
     // console.log(player.LV)
     statementDiv.innerHTML = "Player:<br>LV:" + (player.LV).toString() + "(" + player.exp.toString() + ")"
-    statementDiv.innerHTML = statementDiv.innerHTML + "<br>HP:" + player.HP.toString() + "/" + player.MAXHP.toString()
-    statementDiv.innerHTML = statementDiv.innerHTML + "<br>MP:" + player.MP.toString() + "/" + player.MAXMP.toString()
+    statementDiv.innerHTML = statementDiv.innerHTML + "<br>HP:" + player.HP.toString() + "/" + player.MAXHP.toString();
+    //console.log(player.MP,player.MAXMP);
+    statementDiv.innerHTML = statementDiv.innerHTML + "<br>MP:" + player.MP.toString() + "/" + player.MAXMP.toString();
     statementDiv.innerHTML = statementDiv.innerHTML + "<br>ATK:" + player.atk.toString()
     statementDiv.innerHTML = statementDiv.innerHTML + "<br>DEF:" + player.def.toString()
     statementDiv.innerHTML = statementDiv.innerHTML + "<br>SPD:" + player.speed.toString()
     // gl.clearColor(0,0,0,1);
     // draw_Env_Cube(cameraX,cameraY,cameraZ);
+
+    if(gameover){
+        gl.clearColor(0,0,0,1);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        return;
+    }
+
 
     idx = player.nowRoom;
     var mvpFL = drawoffscreenShadow()
