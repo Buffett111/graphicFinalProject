@@ -106,19 +106,20 @@ var ENV_CUBE_LOOK_DIR = [
     [0.0, -1.0, 0.0],
     [0.0, 0.0, 1.0],
     [0.0, 0.0, -1.0]
-];
+  ];
 
-//camera 6 look up vector to render 6 cubemap faces
-var ENV_CUBE_LOOK_UP = [
+  //camera 6 look up vector to render 6 cubemap faces
+  var ENV_CUBE_LOOK_UP = [
     [0.0, -1.0, 0.0],
     [0.0, -1.0, 0.0],
     [0.0, 0.0, 1.0],
     [0.0, 0.0, -1.0],
     [0.0, -1.0, 0.0],
     [0.0, -1.0, 0.0]
-];
+  ];
 
 gl.useProgram(program);
+
 gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 gl.viewport(0, 0, offScreenWidth, offScreenHeight);
 gl.clearColor(0.4, 0.4, 0.4,1);
@@ -137,9 +138,10 @@ for (var side = 0; side < 6;side++){
                     ENV_CUBE_LOOK_UP[side][1],
                     ENV_CUBE_LOOK_UP[side][2]);
 
-    drawRegularObjects(vpMatrix);
+    drawoffscreen(vpMatrix);
     ///////////////////////////////////////////////////////////
     gl.useProgram(programEnvCube);
+    gl.depthFunc(gl.LEQUAL);
     var vpFromCameraInverse=vpMatrix.invert();
     gl.uniformMatrix4fv(programEnvCube.u_viewDirectionProjectionInverse, 
     false, vpFromCameraInverse.elements);
