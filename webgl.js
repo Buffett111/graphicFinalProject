@@ -441,7 +441,7 @@ async function main() {
     canvas.onmousedown = function (ev) { mouseDown(ev) };
     canvas.onmousemove = function (ev) { mouseMove(ev) };
     canvas.onmouseup = function (ev) { mouseUp(ev) };
-    //canvas.onwheel = function (ev) { scroll(ev) };
+    canvas.onwheel = function (ev) { scroll(ev) };
     var menu = document.getElementById("menu");
 
     document.addEventListener('keydown', function (event) {
@@ -676,7 +676,7 @@ function draw_Cube_offShadow(objComponents, mx, my, mz) {
     modelMatrix.translate(mx * 2, my * 2, mz * 2);
 
     var mvpFromLight = new Matrix4();
-    mvpFromLight.setPerspective(60, offScreenWidth / offScreenHeight, 1, 200);
+    mvpFromLight.setPerspective(70, offScreenWidth / offScreenHeight, 1, 200);
     mvpFromLight.lookAt(lightX, lightY, lightZ, 0, 0, -1 + 0.05, 0, 1, 0);
     mvpFromLight.multiply(modelMatrix);
 
@@ -704,7 +704,7 @@ function draw_player_offShadow(objComponents, mx, my, mz) {
     modelMatrix.scale(0.05, 0.05, 0.05);
 
     var mvpFromLight = new Matrix4();
-    mvpFromLight.setPerspective(60, offScreenWidth / offScreenHeight, 1, 200);
+    mvpFromLight.setPerspective(70, offScreenWidth / offScreenHeight, 1, 200);
     mvpFromLight.lookAt(lightX, lightY, lightZ, 0, 0, -1 + 0.05, 0, 1, 0);
     mvpFromLight.multiply(modelMatrix);
 
@@ -730,7 +730,7 @@ function draw_rock_offShadow(objComponents, mx, my, mz) {
     modelMatrix.scale(0.005, 0.005, 0.005);
 
     var mvpFromLight = new Matrix4();
-    mvpFromLight.setPerspective(60, offScreenWidth / offScreenHeight, 1, 200);
+    mvpFromLight.setPerspective(70, offScreenWidth / offScreenHeight, 1, 200);
     mvpFromLight.lookAt(lightX, lightY, lightZ, 0, 0, -1 + 0.05, 0, 1, 0);
     mvpFromLight.multiply(modelMatrix);
 
@@ -1185,7 +1185,7 @@ function draw_enemy_offShadow(objComponents, mx, my, mz) {
     //modelMatrix.scale(0.5, 0.5, 0.5);
 
     var mvpFromLight = new Matrix4();
-    mvpFromLight.setPerspective(60, offScreenWidth / offScreenHeight, 1, 200);
+    mvpFromLight.setPerspective(70, offScreenWidth / offScreenHeight, 1, 200);
     mvpFromLight.lookAt(lightX, lightY, lightZ, 0, 0, -1 + 0.05, 0, 1, 0);
     mvpFromLight.multiply(modelMatrix);
 
@@ -1449,12 +1449,12 @@ function moveRight(distance) {
 function scroll(ev) {
     // console.log(ev.wheelDelta)
     if (ev.wheelDelta < 0) {
-        cameraX += 0.3;
-        cameraY += 0.3;
+        // cameraX += 0.3;
+        cameraY += 1.5;
         cameraZ += 0.7;
         // ++cameradis;
     } else {
-        cameraX -= 0.3;
+        // cameraX -= 0.3;
         cameraY -= 0.3;
         cameraZ -= 0.7;
         // --cameradis;
