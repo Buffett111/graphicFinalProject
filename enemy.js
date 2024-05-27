@@ -2,9 +2,9 @@ var gameover=false;
 function createEnemy(lv) {
     var enemy = new Object()
     console.log(lv)
-    enemy.LV = Math.floor(Math.random() * 20 ) + lv;
-    enemy.HP = 50 + 5 * enemy.LV;
-    enemy.atk = 2 + 2 * Math.floor(enemy.LV / 5);
+    enemy.LV = Math.floor(Math.random() * 30 ) + lv;
+    enemy.HP = 70 + 5 * enemy.LV;
+    enemy.atk = 5 + 2 * Math.floor(enemy.LV / 3);
     enemy.def = Math.floor(enemy.LV / 8);
     enemy.speeed = 10 + Math.floor(enemy.LV / 10);
     enemy.getDamage = (atk) => {
