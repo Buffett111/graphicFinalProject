@@ -190,9 +190,15 @@ function compileShader(gl, vShaderText, fShaderText) {
 
     return program;
 }
-
+var playerModel=new Matrix4();
+var playervp = new Matrix4();
+var playernormal = new Matrix4();
+var global_viewMatrix = new Matrix4();
+var view=3;
 var texture = {};
-var cameraX = 0, cameraY = 15, cameraZ = 7;
+var cameraX = 0, cameraY = 1, cameraZ = 7;
+var eyeX=0,eyeY=1,eyeZ=0;
+var cX=0,cY=0.5,cZ=0;
 cameraY = 20
 var TcX = 0, TcY = 15, TcZ = 7;
 var firstPersonView = true;
@@ -204,7 +210,7 @@ var gameover = false;
 var camX = 0, camY = 0, camZ = 0;
 var lightX = 0, lightY = 10, lightZ = 3;
 var angleX = 0, angleY = 0;
-
+var pX,pY,pZ;
 var gl;
 var fbo;
 var quadObj;
@@ -232,7 +238,6 @@ var lX, lZ;
 var centerX = 0; // 繞圈的中心位置 X
 var centerY = 0; // 繞圈的中心位置 Y
 var speed = 0.01; // 光源轉動的速度
-
 var fbo;
 async function parseModel(file) {
     try {
@@ -320,6 +325,17 @@ function initProgram(program) {
     program.u_Alpha = gl.getUniformLocation(program, 'u_Alpha');
     program.u_Sampler = gl.getUniformLocation(program, "u_Sampler")
 }
+
+function updatePlayerModelMatrix() {
+    // Update the model matrix with the player's location
+    var tmp=playerModel.multiply([player.location.x-8,player.location.z,player.location.y-8,1]);
+    cameraX=tmp[0];
+    cameraY=tmp[1];
+    cameraZ=tmp[2];
+    // Apply any rotations or additional transformations based on player's direction
+    modelMatrix.rotate(player.direction, 0, 1, 0);
+}
+
 async function main() {
     canvas = document.getElementById('webgl');
     gl = canvas.getContext('webgl2');
@@ -415,20 +431,7 @@ async function main() {
     console.log(objCompImgIndex)
     initGame();
 
-
     gl.useProgram(program);
-
-
-    // putModel('location', objname);
-
-
-    // onloadTexture('tex', 'location')
-
-    //fboShadow = initFrameBuffer(gl);
-    //fbo = initFrameBuffer(gl);
-    //console.log("done")
-    //x,z,y
-
 
     mvpMatrix = new Matrix4();
     modelMatrix = new Matrix4();
@@ -441,7 +444,7 @@ async function main() {
     canvas.onmousedown = function (ev) { mouseDown(ev) };
     canvas.onmousemove = function (ev) { mouseMove(ev) };
     canvas.onmouseup = function (ev) { mouseUp(ev) };
-    //canvas.onwheel = function (ev) { scroll(ev) };
+    canvas.onwheel = function (ev) { scroll(ev) };
     var menu = document.getElementById("menu");
 
     document.addEventListener('keydown', function (event) {
@@ -450,26 +453,55 @@ async function main() {
         // rotateMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
         // var viewDir = new Vector3([cameraDirX, cameraDirY, cameraDirZ]);
         // var newViewDir = rotateMatrix.multiplyVector3(viewDir);
+        let distance = 0.1; // 每次按鍵移動的距離
         switch (event.key) {
             case 'w':
             case 'W':
                 move(1, 0);
-                player.direction = 1;
+                player.direction = 0;
+                eyeX+=1
+                cX+=1
+                if(eyeX<-8)eyeX=7;
+                if(eyeX>8)eyeX=-8;
+                if(cX<-8)cX=7;
+                if(cX>8)cX=-8;
+                if(view==1) switchToFirstPersonView()
                 break;
             case 's':
             case 'S':
                 move(-1, 0);
-                player.direction = 3;
+                eyeX-=1
+                cX-=1
+                if(eyeX<-8)eyeX=7;
+                if(eyeX>8)eyeX=-8;
+                if(cX<-8)cX=7;
+                if(cX>8)cX=-8;
+                player.direction = 180;
+                if(view==1) switchToFirstPersonView()
                 break;
             case 'a':
             case 'A':
                 move(0, -1);
-                player.direction = 4;
+                eyeZ-=1
+                cZ-=1
+                if(eyeZ<-8)eyeZ=7;
+                if(eyeZ>8)eyeZ=-8;
+                if(cZ<-8)cZ=7;
+                if(cZ>8)cZ=-8;
+                player.direction = 270;
+                if(view==1) switchToFirstPersonView()
                 break;
             case 'd':
             case 'D':
                 move(0, 1);
-                player.direction = 2;
+                eyeZ+=1
+                cZ+=1
+                if(eyeZ<-8)eyeZ=7;
+                if(eyeZ>8)eyeZ=-8;
+                if(cZ<-8)cZ=7;
+                if(cZ>8)cZ=-8;
+                player.direction = 90;
+                if(view==1) switchToFirstPersonView()
                 break;
             case 'f':
             case 'F':
@@ -480,7 +512,22 @@ async function main() {
                     switchToOldCameraView();
                 }
                 break;
+            case 'ArrowUp': // 向上箭頭
+                moveForward(distance);
+                break;
+            case 'ArrowDown': // 向下箭頭
+                moveBackward(distance);
+                break;
+            case 'ArrowLeft': // 向左箭頭
+                moveLeft(distance);
+                break;
+            case 'ArrowRight': // 向右箭頭
+                moveRight(distance);
+                break;
         }
+        pX=player.location.x;
+        pY=player.location.y;
+        pZ=player.location.z;
         draw(); // Redraw the scene with the new camera position
         //implment keydown event here
         // let rotateMatrix = new Matrix4();
@@ -531,28 +578,60 @@ function initTexture(gl, img, texKey) {
 
 function switchToFirstPersonView() {
     // 設置第一人稱視角的相機位置和方向
-    let eyeX = player.location.x;
-    let eyeY = player.location.y;
-    let eyeZ = player.location.z + 1; // 視角稍微高於 Sonic 的位置
+    // console.log(pX, pY, pZ)
+    // let playerWorldLocation = new Vector3([pX-8.5, pY-3, pZ-3]);
+    
+    // // 將 player.location 轉換到世界空間
+    // playerWorldLocation = playerModel.multiplyVector3(playerWorldLocation);
+    
+    // let eyeX = playerWorldLocation.elements[0];
+    // let eyeY = playerWorldLocation.elements[1]; // 視角稍微高於 Sonic 的位置
+    // let eyeZ = playerWorldLocation.elements[2];
+    console.log(eyeX, eyeY, eyeZ)
     let centerX = eyeX + Math.cos(player.direction);
-    let centerY = eyeY + Math.sin(player.direction);
-    let centerZ = eyeZ;
+    let centerY = eyeY; // 保持與眼睛高度一致
+    let centerZ = eyeZ + Math.sin(player.direction);
+
     Tcx = cameraX;
     Tcy = cameraY;
     Tcz = cameraZ;
-    cameraX = eyeX;
-    cameraY = eyeY;
-    cameraZ = eyeZ;
 
-    viewMatrix.setLookAt(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, 0, 0, 1);
+    cameraX = eyeX*0.6;
+    cameraY = eyeY*0.6;
+    cameraZ = eyeZ*0.6;
+
+    global_viewMatrix.setPerspective(30, canvas.width / canvas.height, 0.1, 1000);
+    if(player.direction==0){ //w
+        global_viewMatrix.lookAt(eyeX*0.6-1, eyeY+0.3, eyeZ*0.6, cX*0.6, cY+0.3, cZ*0.6, 0, 1, 0);
+    }
+    else if(player.direction==90){  //d
+        global_viewMatrix.lookAt(eyeX*0.6, eyeY+0.3, eyeZ*0.6-1, cX*0.6, cY+0.3, cZ*0.6, 0, 1, 0);
+    }
+    else if(player.direction==180){  //s
+        global_viewMatrix.lookAt(eyeX*0.6+1, eyeY+0.3, eyeZ*0.6, cX*0.6, cY+0.3, cZ*0.6, 0, 1, 0);
+    }
+    else if(player.direction==270){ //a
+        global_viewMatrix.lookAt(eyeX*0.6, eyeY+0.3, eyeZ*0.6+1, cX*0.6, cY+0.3, cZ*0.6, 0, 1, 0);
+    }
+    //global_viewMatrix.lookAt(eyeX*0.6,eyeY+0.3,eyeZ*0.6+1,cX*0.6,cY+0.3,cZ*0.6+1, 0, 1, 0);
+    view = 1;
+    // mvpMatrix.setPerspective(30, 1, 1, 100);
+    // mvpMatrix.lookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
+
+   
+    //global_viewMatrix.lookAt(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, 0, 1, 0);
+
+    draw(); // 重新繪製場景
 }
+
 
 function switchToOldCameraView() {
     // 恢復舊的相機位置
+    view=3;
     cameraX = TcX;
     cameraY = TcY;
     cameraZ = TcZ;
-    viewMatrix.setLookAt(TcX, TcY, TcZ, player.location.x, player.location.y, player.location.z, 0, 0, 1);
+    global_viewMatrix.setLookAt(TcX, TcY, TcZ,0,0,0, 0, 0, 1);
 }
 
 function addTexturesToImgNames(mtl) {
@@ -570,8 +649,8 @@ function addTexturesToImgNames(mtl) {
 }
 
 function draw_rock_off(objComponents, mx, my, mz, tex, vpMatrix) {
-    modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
-    modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    // modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    // modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     modelMatrix.translate(mx * 0.605, my * 1.15, mz * 0.625);
     modelMatrix.scale(0.005, 0.005, 0.005);
     //modelMatrix.scale(0.01, 0.01, 0.01);
@@ -618,8 +697,9 @@ function draw_rock_off(objComponents, mx, my, mz, tex, vpMatrix) {
     // gl.depthMask(true);
 }
 function draw_rock(objComponents, mx, my, mz, tex, cameraX, cameraY, cameraZ, mvpFromLight) {
-    modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
-    modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    // modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    // modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    modelMatrix.setIdentity();
     modelMatrix.translate(mx * 0.605, my * 1.15, mz * 0.625);
     modelMatrix.scale(0.005, 0.005, 0.005);
     //modelMatrix.scale(0.01, 0.01, 0.01);
@@ -627,10 +707,14 @@ function draw_rock(objComponents, mx, my, mz, tex, cameraX, cameraY, cameraZ, mv
     // modelMatrix.translate(0.0, 0.0, -1.0);
     // modelMatrix.scale(1.0, 0.5, 2.0);
     //mvp: projection * view * model matrix  
-    mvpMatrix.setPerspective(30, 1, 1, 100);
-    mvpMatrix.lookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
+    if(view==3){
+        mvpMatrix.setPerspective(30, 1, 1, 100);
+        mvpMatrix.lookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
+    }
+    else{
+        mvpMatrix.set(global_viewMatrix);
+    }
     mvpMatrix.multiply(modelMatrix);
-
 
     //normal matrix
     normalMatrix.setInverseOf(modelMatrix);
@@ -670,8 +754,8 @@ function draw_rock(objComponents, mx, my, mz, tex, cameraX, cameraY, cameraZ, mv
 function draw_Cube_offShadow(objComponents, mx, my, mz) {
     //model Matrix (part of the mvp matrix)
     modelMatrix.setIdentity();
-    modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
-    modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    // modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    // modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     modelMatrix.scale(objScale, objScale, objScale);
     modelMatrix.translate(mx * 2, my * 2, mz * 2);
 
@@ -697,8 +781,8 @@ function draw_Cube_offShadow(objComponents, mx, my, mz) {
 function draw_player_offShadow(objComponents, mx, my, mz) {
     //model Matrix (part of the mvp matrix)
     modelMatrix.setIdentity();
-    modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
-    modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    // modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    // modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     modelMatrix.translate((mx - 0.5) * 0.605, my * 0.6 - 0.9, (mz - 0.5) * 0.605);
 
     modelMatrix.scale(0.05, 0.05, 0.05);
@@ -724,8 +808,9 @@ function draw_player_offShadow(objComponents, mx, my, mz) {
 
 function draw_rock_offShadow(objComponents, mx, my, mz) {
     //model Matrix (part of the mvp matrix)
-    modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
-    modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    // modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    // modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    modelMatrix.setIdentity();
     modelMatrix.translate(mx * 0.605, my * 1.15, mz * 0.625);
     modelMatrix.scale(0.005, 0.005, 0.005);
 
@@ -751,8 +836,8 @@ function draw_rock_offShadow(objComponents, mx, my, mz) {
 function draw_Cube_off(objComponents, mx, my, mz, tex, vpMatrix) {
     //model Matrix (part of the mvp matrix)
     modelMatrix.setIdentity();
-    modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
-    modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    // modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    // modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     modelMatrix.scale(objScale, objScale, objScale);
     modelMatrix.translate(mx * 2, my * 2, mz * 2);
 
@@ -796,16 +881,18 @@ function draw_Cube_off(objComponents, mx, my, mz, tex, vpMatrix) {
 function draw_Cube(objComponents, mx, my, mz, tex, mvpFromLight) {
     //model Matrix (part of the mvp matrix)
     modelMatrix.setIdentity();
-    modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
-    modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    // modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    // modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     modelMatrix.scale(objScale, objScale, objScale);
     modelMatrix.translate(mx * 2, my * 2, mz * 2);
 
-    // modelMatrix.translate(0.0, 0.0, -1.0);
-    // modelMatrix.scale(1.0, 0.5, 2.0);
-    //mvp: projection * view * model matrix  
-    mvpMatrix.setPerspective(30, 1, 1, 100);
-    mvpMatrix.lookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
+    if(view===3){
+        mvpMatrix.setPerspective(30, 1, 1, 100);
+        mvpMatrix.lookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
+    }
+    else{
+        mvpMatrix.set(global_viewMatrix);
+    }
     mvpMatrix.multiply(modelMatrix);
 
 
@@ -867,14 +954,19 @@ function parsetexture(text, mtl) {
 function draw_player(objComponents, mx, my, mz, cameraX, cameraY, cameraZ, mvpFromLight) {
     gl.useProgram(program);
     modelMatrix.setIdentity();
-    modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
-    modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    // modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    // modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     modelMatrix.translate((mx - 0.5) * 0.605, my * 0.6 - 0.9, (mz - 0.5) * 0.605);
-
+    playerModel.set(modelMatrix);
     modelMatrix.scale(0.05, 0.05, 0.05);
 
-    mvpMatrix.setPerspective(30, 1, 1, 100);
-    mvpMatrix.lookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
+    if(view===3){
+        mvpMatrix.setPerspective(30, 1, 1, 100);
+        mvpMatrix.lookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
+    }
+    else{
+        mvpMatrix.set(global_viewMatrix);
+    }    
     mvpMatrix.multiply(modelMatrix);
 
     //normal matrix
@@ -913,13 +1005,18 @@ function draw_player(objComponents, mx, my, mz, cameraX, cameraY, cameraZ, mvpFr
 function draw_enemy(objComponents, mx, my, mz, cameraX, cameraY, cameraZ, tex, mvpFromLight) {
     gl.useProgram(program);
     modelMatrix.setIdentity();
-    modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
-    modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    // modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    // modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     modelMatrix.translate(mx * 0.6, my * 0.6 - 1, mz * 0.6);
     modelMatrix.scale(0.5, 0.5, 0.5);
 
-    mvpMatrix.setPerspective(30, 1, 1, 100);
-    mvpMatrix.lookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
+    if(view==3){
+        mvpMatrix.setPerspective(30, 1, 1, 100);
+        mvpMatrix.lookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
+    }
+    else{
+        mvpMatrix.set(global_viewMatrix);
+    }
     mvpMatrix.multiply(modelMatrix);
 
     //normal matrix
@@ -982,8 +1079,8 @@ function drawoffscreen(vpMatrix) {
 function draw_player_off(objComponents, mx, my, mz, vpMatrix, mvpFromLight) {
     gl.useProgram(program);
     modelMatrix.setIdentity();
-    modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
-    modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    // modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    // modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     modelMatrix.translate((mx - 0.5) * 0.605, my * 0.6 - 0.9, (mz - 0.5) * 0.605);
 
     modelMatrix.scale(0.05, 0.05, 0.05);
@@ -1070,19 +1167,14 @@ function draw() {
     }
     draw_rock(rockObj, lX, 5, lZ, "rock", cameraX, cameraY, cameraZ, mvpFL[cnt++]);
     //console.log("x,y="+player.location.x+","+player.location.y)
-    draw_player(playerObj, player.location.x - 8, player.location.z, player.location.y - 8, cameraX, cameraY, cameraZ, mvpFL[cnt++]);
+    if(view==3)
+        draw_player(playerObj, player.location.x - 8, player.location.z, player.location.y - 8, cameraX, cameraY, cameraZ, mvpFL[cnt++]);
     for (let i = 0; i < map[idx].mobLocation.length; ++i) {
         draw_enemy(enemyObj, map[idx].mobLocation[i].x - 8, map[idx].mobLocation[i].z, map[idx].mobLocation[i].y - 8, cameraX, cameraY, cameraZ, "enemy", mvpFL[cnt++]);
     }
-    //draw_enemy(enemyObj, map[idx].mobLocation[0].x-8, map[idx].mobLocation[0].z, map[idx].mobLocation[0].y-8, cameraX, cameraY, cameraZ,"enemy");
-    // for (let i = 0; i < 5; i++) {
-    //     draw_Cube(cubeObj, -1, -1, i, "stone", mvpFL[cnt++]);
-    // }
-    // gl.clearColor(0,0,0,1);
-    // gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     let rotateMatrix = new Matrix4();
-    rotateMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
-    rotateMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    // rotateMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    // rotateMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     var viewDir = new Vector3([cameraDirX, cameraDirY, cameraDirZ]);
     var newViewDir = rotateMatrix.multiplyVector3(viewDir);
     let vpMatrix = new Matrix4();
@@ -1098,8 +1190,8 @@ function draw() {
     //the sphere
     let mdlMatrix = new Matrix4();
     mdlMatrix.setIdentity();
-    mdlMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
-    mdlMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    // mdlMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    // mdlMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     mdlMatrix.scale(objScale, objScale, objScale);
     mdlMatrix.translate(-8 * 0, 7, 8 * 0);
     //mdlMatrix.setScale(0.5, 0.5, 0.5);
@@ -1116,7 +1208,12 @@ function drawObjectWithDynamicReflection(obj, modelMatrix, vpMatrix, colorR, col
     gl.useProgram(programTextureOnCube);
     let mvpMatrix = new Matrix4();
     let normalMatrix = new Matrix4();
-    mvpMatrix.set(vpMatrix);
+    if(view==3){
+        mvpMatrix.set(vpMatrix);
+    }
+    else{
+        mvpMatrix.set(global_viewMatrix);
+    }
     mvpMatrix.multiply(modelMatrix);
 
     //normal matrix
@@ -1177,8 +1274,8 @@ function drawoffscreenShadow() {
 function draw_enemy_offShadow(objComponents, mx, my, mz) {
 
     modelMatrix.setIdentity();
-    modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
-    modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
+    // modelMatrix.setRotate(angleY, 1, 0, 0);//for mouse rotation
+    // modelMatrix.rotate(angleX, 0, 1, 0);//for mouse rotation
     //modelMatrix.translate((mx - 0.5) * 0.66, my * 0.6 - 0.9, (mz - 0.5) * 0.68-0.2);
     modelMatrix.translate(mx * 0.6, my * 0.6 - 1, mz * 0.6);
     modelMatrix.scale(0.5, 0.5, 0.5);
@@ -1410,8 +1507,8 @@ function mouseMove(ev) {
         var dx = factor * (x - mouseLastX);
         var dy = factor * (y - mouseLastY);
 
-        angleX += dx; //yes, x for y, y for x, this is right
-        angleY += dy;
+        cameraX += dx*0.3; //yes, x for y, y for x, this is right
+        cameraY += dy;
     }
     mouseLastX = x;
     mouseLastY = y;
@@ -1419,44 +1516,41 @@ function mouseMove(ev) {
     draw();
 }
 function moveForward(distance) {
-    //cameraZ += distance * Math.cos(angleX * Math.PI / 180);
-    //cameraX += distance * Math.sin(angleX * Math.PI / 180);
-    cameraX += distance
-    cameraZ += distance * 3
+    let radian = player.direction * Math.PI / 180; // 將角度轉換為弧度
+    cameraX += distance * Math.cos(radian);
+    cameraZ += distance * Math.sin(radian);
 }
 
 function moveBackward(distance) {
-    //cameraZ -= distance * Math.cos(angleX * Math.PI / 180);
-    //cameraX -= distance * Math.sin(angleX * Math.PI / 180);
-    cameraX -= distance;
-    cameraZ -= distance * 3
+    let radian = player.direction * Math.PI / 180; // 將角度轉換為弧度
+    cameraX -= distance * Math.cos(radian);
+    cameraZ -= distance * Math.sin(radian);
 }
 
 function moveLeft(distance) {
-    //cameraX -= distance * Math.cos(angleX * Math.PI / 180);
-    //cameraZ += distance * Math.sin(angleX * Math.PI / 180);
-    cameraX -= distance;
-    cameraZ -= distance * 3;
+    let radian = player.direction * Math.PI / 180; // 將角度轉換為弧度
+    cameraX -= distance * Math.sin(radian);
+    cameraZ += distance * Math.cos(radian);
 }
 
 function moveRight(distance) {
-    //cameraX += distance * Math.cos(angleX * Math.PI / 180);
-    //cameraZ -= distance * Math.sin(angleX * Math.PI / 180);
-    cameraX += distance;
-    cameraZ += distance * 3;
+    let radian = player.direction * Math.PI / 180; // 將角度轉換為弧度
+    console.log("ply.loc="+player.direction)
+    cameraX += distance * Math.sin(radian);
+    cameraZ -= distance * Math.cos(radian);
 }
 
 function scroll(ev) {
     // console.log(ev.wheelDelta)
     if (ev.wheelDelta < 0) {
-        cameraX += 0.3;
-        cameraY += 0.3;
-        cameraZ += 0.7;
+        cameraX += 0.1*cameraX;
+        cameraY += 0.1*cameraY;
+        cameraZ += 0.1*cameraZ;
         // ++cameradis;
     } else {
-        cameraX -= 0.3;
-        cameraY -= 0.3;
-        cameraZ -= 0.7;
+        cameraX -= 0.1*cameraX;
+        cameraY -= 0.1*cameraY;
+        cameraZ -= 0.1*cameraZ;
         // --cameradis;
     }
 }
